@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{{ content|safe }}
+
+{% if tags %}
+<footer>
+    <p class="tags">
+        Tags: 
+        {% for tag in tags %}
+        <a href="/tag/{{ tag }}" class="tag">{{ tag }}</a>
+        {% endfor %}
+    </p>
+</footer>
+{% endif %}
+{% endblock %}

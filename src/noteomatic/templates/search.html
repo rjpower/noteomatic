@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results{% endblock %}
+
+{% block content %}
+<article>
+    <h1>Search Results for "{{ query }}"</h1>
+
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% else %}
+    {% if results %}
+    <ul>
+        {% for result in results %}
+        <li>
+            <h2><a href="/notes/{{ result.path }}">{{ result.title }}</a></h2>
+            {% if result.date %}
+            <p class="date">{{ result.date }}</p>
+            {% endif %}
+            {% if result.snippet %}
+            <div class="snippet">{{ result.snippet|safe }}</div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No results found for "{{ query }}".</p>
+    {% endif %}
+    {% endif %}
+</article>
+{% endblock %}

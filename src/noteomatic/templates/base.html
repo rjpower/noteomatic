@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/tufte.css">
+    <script src="/static/navigation.js" defer></script>
+</head>
+<body>
+    <nav>
+        <div class="nav-main">
+            <a href="/">Home</a> |
+            <a href="/tags">Tags</a> |
+            <form id="search-form" action="/search" method="get" style="display: inline-block">
+                <input type="text" name="q" placeholder="Search..." required>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        {% if prev_url or next_url %}
+        <div id="nav-controls">
+            {% if prev_url %}
+            <a href="{{ prev_url }}" id="prev-note" class="nav-arrow">← Previous</a>
+            {% endif %}
+            {% if next_url %}
+            <a href="{{ next_url }}" id="next-note" class="nav-arrow">Next →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </nav>
+    <style>
+        nav {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-arrow {
+            margin: 0 0.5rem;
+            text-decoration: none;
+        }
+        #search-form {
+            margin-left: 1rem;
+        }
+        #search-form input[type="text"] {
+            font-size: 1rem;
+            padding: 0.2rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        #search-form button {
+            font-size: 1rem;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+        }
+    </style>
+    {% block content %}{% endblock %}
+</body>
+</html>

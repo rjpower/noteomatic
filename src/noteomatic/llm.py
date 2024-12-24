@@ -1,10 +1,27 @@
 import base64
 import multiprocessing.dummy
-from typing import List
+from datetime import date
+from typing import List, Optional
 
 from litellm import completion
+from pydantic import BaseModel
 
 from .pdf import ImageData
+
+
+class TodoCommand(BaseModel):
+    message: str
+    due_date: Optional[date] = None
+
+
+class Command(BaseModel):
+    name: str
+    payload: dict
+
+
+COMMAND_TYPES = {
+    "todo": TodoCommand,
+}
 
 SYSTEM_PROMPT = """
 
@@ -18,6 +35,19 @@ missing content or difficult to read text by using your intution.  You always
 treat the original text with respect and care, and you never omit any content.
 You always indicate if you can't extract a piece of information and provide your
 best guess.
+
+## Handling Commands:
+
+When you encounter text in the format [command: content], parse it as a command.
+The command name comes before the colon, and the content after is the payload.
+
+For todo commands, use this format:
+[command: todo] message [due: optional date]
+
+Convert commands into <command> tags with JSON payloads. For example:
+<command>{"name": "todo", "payload": {"message": "Buy milk", "due_date": "2024-12-31"}}</command>
+
+Place command blocks where they appear in the note content.
 
 Notes all have the same format: a left hand margin with tags and margin notes
 and note content in the main body on the right. You always keep these separate
@@ -117,7 +147,8 @@ Aggressively infer missing information from context:
   * Infer tags from the content if they are missing.
   * Infer illegible words or abbreviations based on the surrounding text.
   * Infer subjects from the content of the note, using vocabulary similar to the tags.
-  * If you extraction is unclear indicate with <unclear>...</unclear> tags. 
+  * If you extraction is unclear indicate with <unclear>...</unclear> tags.
+  * For commands, infer missing fields like dates from context when possible.
 """
 
 CLEANUP_PROMPT = """
@@ -196,7 +227,8 @@ def query_llm_with_cleanup(messages, raw_results=None):
 
     return cleaned
 
-def process_images_with_llm(images: List[ImageData], batch_size: int = 8) -> List[str]:
+
+def process_images_with_llm(images: List[ImageData], batch_size: int = 16) -> List[str]:
     """Process images through LLM to extract notes"""
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -208,7 +240,7 @@ def process_images_with_llm(images: List[ImageData], batch_size: int = 8) -> Lis
     for i in range(0, len(images), batch_size):
         img_batch = images[i : i + batch_size]
         batch_messages = messages.copy()
-        
+
         for img in img_batch:
             batch_messages.append({
                 "role": "user",
@@ -224,5 +256,5 @@ def process_images_with_llm(images: List[ImageData], batch_size: int = 8) -> Lis
     # Process batches in parallel
     with multiprocessing.dummy.Pool(16) as pool:
         results = pool.map(query_llm_with_cleanup, batches)
-    
+
     return results

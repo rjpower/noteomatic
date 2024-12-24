@@ -1,23 +1,19 @@
-import base64
 import glob
 import logging
-import os.path
 import pickle
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import typer
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 from noteomatic.llm import process_images_with_llm
 from noteomatic.notes import save_notes, split_notes
-from noteomatic.pdf import ImageData, extract_images_from_pdf
+from noteomatic.pdf import extract_images_from_pdf
 
 app = typer.Typer()
 

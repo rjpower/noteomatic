@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        {{ tufte_css|safe }}
+    </style>
+    <style>
+        nav {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-arrow {
+            margin: 0 0.5rem;
+            text-decoration: none;
+        }
+        #search-form {
+            margin-left: 1rem;
+        }
+        #search-form input[type="text"] {
+            font-size: 1rem;
+            padding: 0.2rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        #search-form button {
+            font-size: 1rem;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    {{ content|safe }}
+</body>
+</html>

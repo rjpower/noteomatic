@@ -3,7 +3,36 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
+<div class="share-container">
+    <button onclick="shareNote()" class="share-button">Share this note</button>
+</div>
+<div id="share-result" style="display: none;"></div>
+
 {{ content|safe }}
+
+<script>
+function shareNote() {
+    fetch(`/share/{{ note_id }}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        const shareResultDiv = document.getElementById('share-result');
+        if (data.success) {
+            shareResultDiv.innerHTML = `Note shared successfully! URL: <a href="${data.url}">${data.url}</a>`;
+        } else {
+            shareResultDiv.innerHTML = `Error sharing note: ${data.error}`;
+        }
+        shareResultDiv.style.display = 'block';
+    })
+    .catch(error => {
+        const shareResultDiv = document.getElementById('share-result');
+        shareResultDiv.innerHTML = 'Error sharing note';
+        shareResultDiv.style.display = 'block';
+        console.error(error);
+    });
+}
+</script>
 
 {% if tags %}
 <footer>

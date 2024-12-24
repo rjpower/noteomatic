@@ -7,15 +7,16 @@
     <h1>Available Notes</h1>
     
     {% for note in notes %}
+    {% set metadata = note.metadata %}
     <section class="note-preview">
-        <h2><a href="/notes/{{ note.path }}">{{ note.title }}</a></h2>
-        {% if note.date %}
-        <p class="date">{{ note.date }}</p>
+        <h2><a href="/note/{{ note.id }}">{{ metadata.title }}</a></h2>
+        {% if metadata.date %}
+        <p class="date">{{ metadata.date }}</p>
         {% endif %}
-        {% if note.tags %}
+        {% if metadata.tags %}
         <p class="tags">
             Tags: 
-            {% for tag in note.tags %}
+            {% for tag in metadata.tags %}
             <a href="/tag/{{ tag }}" class="tag">{{ tag }}</a>
             {% endfor %}
         </p>

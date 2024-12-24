@@ -17,6 +17,7 @@ dependencies = [
     "google-auth-oauthlib>=1.2.1",
     "beautifulsoup4>=4.12.3",
     "graphviz>=0.20.3",
+    "pydantic-settings>=2.7.0",
 ]
 
 [build-system]

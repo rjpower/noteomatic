@@ -11,15 +11,12 @@
     {% else %}
     {% if results %}
     <ul>
-        {% for result in results %}
+        {% for note in results %}
+        {% set metadata = note.metadata %}
         <li>
-            <h2><a href="/notes/{{ result.path }}">{{ result.title }}</a></h2>
-            {% if result.date %}
-            <p class="date">{{ result.date }}</p>
-            {% endif %}
-            {% if result.snippet %}
-            <div class="snippet">{{ result.snippet|safe }}</div>
-            {% endif %}
+            <h2><a href="/note/{{ note.id }}">{{ metadata.title }}</a></h2>
+            <p class="date">{{ metadata.date }}</p>
+            <div class="snippet">{{ note.snippet|safe }}</div>
         </li>
         {% endfor %}
     </ul>

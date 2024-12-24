@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload PDF</title>
+    <style>
+        .drop-zone {
+            width: 100%;
+            max-width: 600px;
+            height: 200px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #777;
+            border: 4px dashed #009578;
+            border-radius: 10px;
+            margin: 20px auto;
+        }
+
+        .drop-zone--over {
+            border-style: solid;
+            background-color: rgba(0, 149, 120, 0.1);
+        }
+
+        .drop-zone__input {
+            display: none;
+        }
+
+        #status {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload PDF</h1>
+    <div class="drop-zone">
+        <span class="drop-zone__prompt">Drop PDF file here or click to upload</span>
+        <input type="file" name="pdf" class="drop-zone__input" accept=".pdf">
+    </div>
+    <div id="status"></div>
+
+    <script>
+        document.querySelectorAll(".drop-zone").forEach(dropZone => {
+            const input = dropZone.querySelector(".drop-zone__input");
+
+            dropZone.addEventListener("click", e => {
+                input.click();
+            });
+
+            input.addEventListener("change", e => {
+                if (input.files.length) {
+                    uploadFile(input.files[0]);
+                }
+            });
+
+            dropZone.addEventListener("dragover", e => {
+                e.preventDefault();
+                dropZone.classList.add("drop-zone--over");
+            });
+
+            ["dragleave", "dragend"].forEach(type => {
+                dropZone.addEventListener(type, e => {
+                    dropZone.classList.remove("drop-zone--over");
+                });
+            });
+
+            dropZone.addEventListener("drop", e => {
+                e.preventDefault();
+                dropZone.classList.remove("drop-zone--over");
+
+                if (e.dataTransfer.files.length) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.type === "application/pdf") {
+                        uploadFile(file);
+                    } else {
+                        document.getElementById("status").textContent = "Please upload a PDF file";
+                    }
+                }
+            });
+        });
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append("pdf", file);
+            
+            document.getElementById("status").textContent = "Uploading...";
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById("status").textContent = "Upload successful! Redirecting...";
+                    window.location.href = "/";
+                } else {
+                    document.getElementById("status").textContent = "Error: " + data.error;
+                }
+            })
+            .catch(error => {
+                document.getElementById("status").textContent = "Error uploading file: " + error;
+            });
+        }
+    </script>
+</body>
+</html>

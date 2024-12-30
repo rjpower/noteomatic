@@ -12,10 +12,9 @@
     {% if results %}
     <ul>
         {% for note in results %}
-        {% set metadata = note.metadata %}
         <li>
-            <h2><a href="/note/{{ note.id }}">{{ metadata.title }}</a></h2>
-            <p class="date">{{ metadata.date }}</p>
+            <h2><a href="/note/{{ note.id }}">{{ note.title }}</a></h2>
+            <p class="date">{{ note.date }}</p>
             <div class="snippet">{{ note.snippet|safe }}</div>
         </li>
         {% endfor %}

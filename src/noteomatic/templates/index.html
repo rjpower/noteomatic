@@ -5,18 +5,16 @@
 {% block content %}
 <article>
     <h1>Available Notes</h1>
+    <p><a href="/upload" class="upload-link">Upload New Note</a></p>
     
     {% for note in notes %}
-    {% set metadata = note.metadata %}
     <section class="note-preview">
-        <h2><a href="/note/{{ note.id }}">{{ metadata.title }}</a></h2>
-        {% if metadata.date %}
-        <p class="date">{{ metadata.date }}</p>
-        {% endif %}
-        {% if metadata.tags %}
+        <h2><a href="/note/{{ note.id }}">{{ note.title }}</a></h2>
+        <p class="date">{{ note.created_at }}</p>
+        {% if note.tags %}
         <p class="tags">
             Tags: 
-            {% for tag in metadata.tags %}
+            {% for tag in note.tags %}
             <a href="/tag/{{ tag }}" class="tag">{{ tag }}</a>
             {% endfor %}
         </p>

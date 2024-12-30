@@ -3,17 +3,18 @@ import logging
 import pickle
 import shutil
 from pathlib import Path
-from typing import List
 
 import typer
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+from sqlalchemy import create_engine, text
+from sqlalchemy_utils import create_database, database_exists
 
-from noteomatic.llm import process_images_with_llm
-from noteomatic.notes import save_notes, split_notes
-from noteomatic.pdf import extract_images_from_pdf
+from noteomatic.config import settings
+from noteomatic.database import Base
+from noteomatic.lib import process_pdf_files
 
 app = typer.Typer()
 
@@ -26,28 +27,42 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def process_pdf_files(sources: List[Path], raw_dir: Path, build_dir: Path):
-    """Process a list of PDF files and generate notes."""
-    for pdf_file in sources:
-        source_name = pdf_file.stem
-        image_dir = build_dir / "images" / source_name
-        notes_dir = build_dir / "notes" / source_name
+@app.command("list-schema")
+def list_schema():
+    """List the database schema"""
+    engine = create_engine(settings.db.get_url())
+    with engine.connect() as connection:
+        sql = text(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        )
+        result = connection.execute(sql)
+        tables = result.fetchall()
 
-        image_dir.mkdir(parents=True, exist_ok=True)
-        notes_dir.mkdir(parents=True, exist_ok=True)
+    typer.echo("Tables:")
+    for table in tables:
+        typer.echo(f"- {table[0]}")
 
-        # Extract images from PDF
-        images = extract_images_from_pdf(pdf_file)
-        typer.echo(f"Extracted {len(images)} images from {pdf_file}")
 
-        # Process with LLM
-        results = process_images_with_llm(images)
+@app.command("reset-db")
+def reset_db(force: bool = typer.Option(False, "--force", "-f", help="Force reset without confirmation")):
+    """Reset database tables - WARNING: This will delete all data!"""
+    if not force:
+        confirm = typer.confirm("⚠️  This will delete all data. Are you sure?", abort=True)
 
-        # Save notes
-        notes = split_notes(results)
-        save_notes(notes, notes_dir)
+    engine = create_engine(settings.db.get_url())
+    # create the DB using sqlalchemy-util and the engine url
+    if not database_exists(engine.url):
+        create_database(engine.url)
 
-        typer.echo(f"Processed {pdf_file} -> {len(notes)} notes")
+    # Drop all tables
+    Base.metadata.drop_all(engine)
+    typer.echo("Dropped all tables")
+
+    # Recreate tables
+    Base.metadata.create_all(engine)
+    typer.echo("Created new tables")
+
+    typer.echo("✅ Database reset complete")
 
 def get_google_drive_service():
     """Get authenticated Google Drive service."""
@@ -72,6 +87,7 @@ def get_google_drive_service():
             pickle.dump(creds, token)
 
     return build('drive', 'v3', credentials=creds)
+
 
 @app.command()
 def sync(
@@ -131,6 +147,7 @@ def sync(
         process_pdf_files(new_files, raw_dir, build_dir)
     else:
         typer.echo("No new files to process")
+
 
 @app.command()
 def submit(

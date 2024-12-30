@@ -18,6 +18,12 @@ dependencies = [
     "beautifulsoup4>=4.12.3",
     "graphviz>=0.20.3",
     "pydantic-settings>=2.7.0",
+    "sqlalchemy>=2.0.36",
+    "psycopg>=3.2.3",
+    "alembic>=1.14.0",
+    "psycopg-binary>=3.2.3",
+    "sqlalchemy-utils>=0.41.2",
+    "mypy>=1.14.0",
 ]
 
 [build-system]

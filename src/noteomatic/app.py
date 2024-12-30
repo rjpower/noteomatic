@@ -2,13 +2,12 @@ import base64
 import hashlib
 import logging
 import os
-import sqlite3
 import subprocess
 import tempfile
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import bs4
 import graphviz
@@ -22,42 +21,62 @@ from flask import (
     request,
 )
 from googleapiclient.http import MediaIoBaseDownload
-from pydantic import BaseModel, ConfigDict, Field, PostgresDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from noteomatic.config import settings
+from noteomatic.database import NoteModel, get_repo
 from noteomatic.lib import get_google_drive_service, process_pdf_files
 
-
-class AppSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="NOTEOMATIC_", env_file=".env", env_file_encoding="utf-8"
-    )
-
-    root_dir: Path = Path(__file__).parent.parent.parent
-    scp_target: str = Field(
-        default="user@example.com:/var/www/html/shared",
-        description="SCP target for sharing notes",
-    )
-    public_share_url: str = ""
-    build_dir: Path = root_dir / "build"
-    raw_dir: Path = root_dir / "raw"
-    notes_dir: Path = build_dir / "notes"
-    debug: bool = Field(default=False, description="Enable debug mode")
-    log_level: str = Field(default="INFO", description="Logging level")
-    database_url: Optional[PostgresDsn] = Field(
-        default=None, description="Database connection URL"
-    )
-
-    @property
-    def static_dir(self) -> Path:
-        return self.root_dir / "static"
-
-    @property
-    def template_dir(self) -> Path:
-        return Path(__file__).parent / "templates"
+# Cache for database connection
+_db_connection = None
 
 
-settings = AppSettings()
+def _get_note_hash(title: str) -> str:
+    """Generate a consistent hash for note sharing"""
+    return hashlib.md5(title.encode()).hexdigest()[:8]
+
+
+def get_note_by_id(note_id: int) -> NoteModel:
+    """Get a note by its ID"""
+    with get_repo() as repo:
+        note = repo.get_by_id(note_id)
+        if not note:
+            raise KeyError(f"Note with ID {note_id} not found")
+        return note
+
+def get_all_notes() -> List[NoteModel]:
+    """Get all notes from the database"""
+    with get_repo() as repo:
+        return repo.get_all()
+
+def count_notes() -> int:
+    """Count the number of notes in the database"""
+    with get_repo() as repo:
+        return repo.count()
+
+
+def load_notes_from_dir(dir: Path) -> List[NoteModel]:
+    """Load all notes from a directory into the database"""
+    notes = []
+    for dirpath, dirnames, filenames in os.walk(dir):
+        for filename in filenames:
+            file = Path(dirpath) / filename
+            if file.is_dir() or file.suffix != ".html":
+                continue
+
+            content, note = NoteModel.from_file(file, NOTES_DIR)
+            logging.info("Adding/updating note from %s, %s", file, note.title)
+
+            with get_repo() as repo:
+                note = repo.create(
+                    title=note.title,
+                    path=note.path,
+                    content=content,
+                    tags=note.tags,
+                    created_at=note.created_at or datetime.now(),
+                )
+                notes.append(note)
+    return notes
+
 NOTES_DIR = settings.notes_dir
 
 app = Flask(
@@ -73,206 +92,13 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-# Cache for database connection
-_db_connection = None
 
-class NoteMetadata(BaseModel):
-    path: str
-    title: str
-    date: Optional[str]
-    datetime: Optional[datetime]
-    tags: List[str]
-    snippet: Optional[str] = None
+def _init():
+    logging.info(f"Initializing database from {NOTES_DIR}")
+    load_notes_from_dir(NOTES_DIR)
 
 
-class Note(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    id: Optional[int] = None
-    metadata: NoteMetadata
-    raw_content: str
-    article_content: Tag
-    graphs: List[Tag]
-
-    snippet: str = ""
-
-    @classmethod
-    def from_db_row(cls, row: sqlite3.Row) -> "Note":
-        """Create a Note from a database row"""
-        payload = row["payload"]
-        metadata = NoteMetadata.model_validate_json(row["metadata"])
-        return cls.parse(payload, metadata.path).model_copy(update={"id": row["id"]})
-
-    @classmethod
-    def from_file(cls, file_path: Path) -> "Note":
-        """Create a Note by parsing a file"""
-        content = file_path.read_text()
-        return cls.parse(content, path=str(file_path.relative_to(NOTES_DIR)))
-
-    @classmethod
-    def parse(cls, content: str, path: str) -> "Note":
-        """Parse note content into a Note instance"""
-        soup = BeautifulSoup(content, "html.parser")
-
-        # Parse metadata
-        title = soup.find("meta", {"name": "title"})
-        title = title["content"] if title else Path(path).stem
-
-        date_meta = soup.find("meta", {"name": "date"})
-        date = date_meta["content"] if date_meta else None
-
-        # Try to parse the date into a datetime object
-        parsed_datetime = None
-        if date:
-            try:
-                # Try common formats
-                for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
-                    try:
-                        parsed_datetime = datetime.strptime(date, fmt)
-                        break
-                    except ValueError:
-                        continue
-            except Exception:
-                parsed_datetime = None
-
-        tags_meta = soup.find("meta", {"name": "tags"})
-        tags = []
-        if tags_meta and tags_meta["content"]:
-            tags = tags_meta["content"].split(",")
-            tags = [tag.strip().lower() for tag in tags]
-
-        metadata = NoteMetadata(
-            path=path,
-            title=title,
-            date=date,
-            datetime=parsed_datetime,
-            tags=tags,
-        )
-
-        # Extract body content
-        article_content = soup.find("article") or soup.find("body") or soup
-
-        # Find all graph tags
-        graphs = soup.find_all("graph")
-
-        return cls(
-            metadata=metadata,
-            raw_content=content,
-            article_content=article_content,
-            graphs=graphs,
-        )
-
-
-def _create_tables(conn):
-    conn.row_factory = sqlite3.Row
-
-    conn.execute(
-        """
-      CREATE TABLE IF NOT EXISTS notes (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          title TEXT NOT NULL,
-          metadata TEXT NOT NULL,
-          payload TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-  """
-    )
-
-    conn.execute(
-        """
-      CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts 
-      USING fts5(note_id, title, path, content, tags, date, datetime, tokenize='porter')
-  """
-    )
-
-
-def get_db_connection():
-    """Get a connection to the database, using cache if available"""
-    global _db_connection
-    if _db_connection is None:
-        _db_connection = sqlite3.connect(":memory:")
-        _load_all_notes(_db_connection)
-
-    return _db_connection
-
-
-def _get_note_hash(title: str) -> str:
-    """Generate a consistent hash for note sharing"""
-    return hashlib.md5(title.encode()).hexdigest()[:8]
-
-
-def _load_all_notes(conn) -> None:
-    """Load all notes into database"""
-    conn.execute("DROP TABLE IF EXISTS notes")
-    conn.execute("DROP TABLE IF EXISTS notes_fts")
-    _create_tables(conn)
-
-    for root, _, files in os.walk(settings.notes_dir):
-        for file in files:
-            if file.endswith(".html"):
-                file_path = Path(root) / file
-                parsed_note = Note.from_file(file_path)
-
-                # Insert into main notes table
-                cursor = conn.execute(
-                    "INSERT INTO notes (title, metadata, payload, created_at) VALUES (?, ?, ?, ?)",
-                    (
-                        parsed_note.metadata.title,
-                        parsed_note.metadata.model_dump_json(),
-                        file_path.read_text(),
-                        parsed_note.metadata.datetime.isoformat(),
-                    ),
-                )
-                note_id = cursor.lastrowid
-
-                # Insert into FTS table
-                conn.execute(
-                    "INSERT INTO notes_fts (note_id, title, path, content, tags, date, datetime) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        note_id,
-                        parsed_note.metadata.title,
-                        parsed_note.metadata.path,
-                        parsed_note.raw_content,
-                        ",".join(parsed_note.metadata.tags),
-                        parsed_note.metadata.date,
-                        parsed_note.metadata.datetime,
-                    ),
-                )
-    conn.commit()
-
-
-def get_note_by_id(note_id: int) -> Note:
-    """Get a note by its ID"""
-    conn = get_db_connection()
-    row = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
-    if not row:
-        raise KeyError(f"Note with ID {note_id} not found")
-
-    return Note.from_db_row(row)
-
-
-def get_all_notes() -> List[Note]:
-    """Get all notes from the database"""
-    conn = get_db_connection()
-    cursor = conn.execute(
-        """
-        SELECT n.id, n.title, n.metadata, n.payload 
-        FROM notes n
-        ORDER BY n.created_at DESC, n.title DESC
-    """
-    )
-    return [
-        Note.from_db_row(row)
-        for row in cursor
-    ]
-
-
-def count_notes() -> int:
-    """Count the number of notes in the database"""
-    conn = get_db_connection()
-    cursor = conn.execute("SELECT COUNT(*) FROM notes")
-    return cursor.fetchone()[0]
-
+_init()
 
 @app.route("/search")
 def search():
@@ -281,18 +107,8 @@ def search():
     if not query:
         return render_template("search.html", error="No query provided")
 
-    conn = get_db_connection()
-    cursor = conn.execute(
-        """
-        SELECT notes.*
-        FROM notes_fts
-        JOIN notes ON notes.id = notes_fts.note_id
-        WHERE notes_fts MATCH ?
-        ORDER BY bm25(notes_fts), datetime DESC, title DESC
-        """,
-        (query,),
-    )
-    search_results = [Note.from_db_row(row) for row in cursor]
+    with get_repo() as repo:
+        search_results = repo.search(query)
 
     # Extract snippets
     for note in search_results:
@@ -329,7 +145,7 @@ def show_note(note_id):
 
     # Process any graph tags
     soup = bs4.BeautifulSoup(note.raw_content, "html.parser")
-    for graph_tag in note.graphs:
+    for graph_tag in soup.find_all("graph"):
         # Create an img tag to replace the graph
         img = soup.new_tag("img")
         graph_content = graph_tag.string or ""
@@ -354,10 +170,10 @@ def show_note(note_id):
     return render_template(
         "note.html",
         note_id=note_id,
-        content=str(note.article_content),
-        title=note.metadata.title,
-        date=note.metadata.date,
-        tags=note.metadata.tags,
+        content=soup.prettify(),
+        title=note.title,
+        date=note.created_at.strftime("%Y-%m-%d"),
+        tags=note.tags,
         prev_url=prev_url,
         next_url=next_url,
     )
@@ -371,7 +187,7 @@ def show_tag(tag):
 
     tag = tag.lower()
     for note in notes:
-        if tag in [t.lower() for t in note.metadata.tags]:
+        if tag in [t.lower() for t in note.tags]:
             # Read the content and extract a snippet
             content = note.raw_content
             soup = BeautifulSoup(content, "html.parser")
@@ -391,7 +207,7 @@ def show_all_tags():
     notes = get_all_notes()
     all_tags = set()
     for note in notes:
-        all_tags.update(tag.lower() for tag in note.metadata.tags)
+        all_tags.update(tag.lower() for tag in note.tags)
     return render_template("tags.html", tags=sorted(all_tags))
 
 
@@ -401,7 +217,6 @@ def share_note(note_id):
     note = get_note_by_id(note_id)
     if not note:
         return abort(500, "Note not found")
-
     # Create a temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -410,14 +225,14 @@ def share_note(note_id):
         standalone_html = render_template(
             "shared_note.html",
             content=str(note.article_content),
-            title=note.metadata.title,
-            date=note.metadata.date,
-            tags=note.metadata.tags,
+            title=note.title,
+            date=note.created_at.strftime("%Y-%m-%d"),
+            tags=note.tags,
             tufte_css=tufte_css,
         )
 
         # Save HTML file
-        file_hash = _get_note_hash(note.metadata.title)
+        file_hash = _get_note_hash(note.title)
         output_file = temp_path / f"{file_hash}.html"
         output_file.write_text(standalone_html)
 
@@ -511,7 +326,6 @@ def upload():
     try:
         # Process the uploaded PDF
         process_pdf_files([file_path], upload_dir, Path(settings.build_dir))
-        _load_all_notes(_db_connection)
         return jsonify({"success": True})
     except Exception as e:
         return (
@@ -556,8 +370,6 @@ def sync():
     process_pdf_files(
         [local_path], Path(app.config["RAW_DIR"]), Path(app.config["BUILD_DIR"])
     )
-    _load_all_notes(_db_connection)
-
     return jsonify({"success": True, "message": f"Processed {file_name}"})
 
 

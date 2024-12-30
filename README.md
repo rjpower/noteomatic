@@ -6,8 +6,18 @@ Install UV:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-# Importing Notes
+# Configuration
 
+Configuration is managed by Pydantic-Settings and environment variables. You can
+setup a basic .env with:
+
+```
+cat > .env <<HERE
+NOTEOMATIC_DB_URL=sqlite:///build/notes.db
+HERE
+```
+
+# Importing Notes
 
 ## Sync with Google Drive
 
@@ -18,17 +28,19 @@ secrets into `credentials/client_secret.json`:
 https://console.cloud.google.com/auth/scopes
 
 ```
-uv run scripts/extract.py sync
+uv run scripts/manage.py sync
 ```
 
 ## Syncing files on disk
 
-```
-uv run scripts/extract.py submit --source=path/to/pdf_or_glob
-```
-
-# Running the browser
+Alternatively, you can load new notes on the command line using the submit command:
 
 ```
- FLASK_DEBUG=1 uv run flask --app noteomatic.app:app run --reload --port=8000
- ```
+uv run scripts/manage.py submit --source=path/to/pdf_or_glob
+```
+
+# Running the server
+
+```
+ FLASK_DEBUG=1 uv run flask --app noteomatic.app:app run --reload --port=8000 [--host=...]
+```

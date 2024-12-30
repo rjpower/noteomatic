@@ -17,8 +17,6 @@ secrets into `credentials/client_secret.json`:
 
 https://console.cloud.google.com/auth/scopes
 
-
-the scope to request is: https://www.googleapis.com/auth/drive.readonly
 ```
 uv run scripts/extract.py sync
 ```
@@ -33,12 +31,4 @@ uv run scripts/extract.py submit --source=path/to/pdf_or_glob
 
 ```
  FLASK_DEBUG=1 uv run flask --app noteomatic.app:app run --reload --port=8000
-```
-
-# Running in the browser, and listening to a public ip address:
-
-```
-
- FLASK_DEBUG=1 uv run flask --app noteomatic.app:app run --reload --port=8000 --host 0.0.0.0
-
-```
+ ```

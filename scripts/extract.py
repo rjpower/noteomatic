@@ -14,8 +14,6 @@ from googleapiclient.http import MediaIoBaseDownload
 from noteomatic.llm import process_images_with_llm
 from noteomatic.notes import save_notes, split_notes
 from noteomatic.pdf import extract_images_from_pdf
-import webbrowser
-
 
 app = typer.Typer()
 
@@ -68,16 +66,8 @@ def get_google_drive_service():
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
                 credentials_path, SCOPES)
-            try:
-                creds = flow.run_local_server(port=0)
-            except webbrowser.Error:
-                auth_url, _ = flow.authorization_url(prompt='consent')
-                print(auth_url)
-                auth_code = input("Enter the authorization code: ")
-                flow.fetch_token(code=auth_code)
-                creds = flow.credentials
-                print (dir(creds))
- 
+            creds = flow.run_local_server(port=0)
+        
         with open(token_path, 'wb') as token:
             pickle.dump(creds, token)
 

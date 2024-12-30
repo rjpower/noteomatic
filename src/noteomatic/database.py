@@ -4,12 +4,46 @@ from pathlib import Path
 from typing import Generator, List, Optional
 
 from bs4 import BeautifulSoup, Tag
-from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, select
+import sqlite3
+from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, select, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from noteomatic import config
 
-engine = create_engine(config.settings.db.get_url(), pool_pre_ping=True)
+def setup_sqlite_engine():
+    """Configure SQLite engine with appropriate settings"""
+    url = config.settings.db.get_url()
+    connect_args = {"timeout": config.settings.db.sqlite_timeout}
+    
+    if url.startswith("sqlite"):
+        engine = create_engine(
+            url,
+            pool_pre_ping=True,
+            connect_args=connect_args,
+            pool_size=config.settings.db.pool_size,
+            max_overflow=config.settings.db.max_overflow,
+        )
+        
+        if config.settings.db.sqlite_wal:
+            # Enable WAL mode
+            @event.listens_for(engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                if isinstance(dbapi_connection, sqlite3.Connection):
+                    cursor = dbapi_connection.cursor()
+                    cursor.execute("PRAGMA journal_mode=WAL")
+                    cursor.execute("PRAGMA busy_timeout=10000")  # 10s timeout
+                    cursor.close()
+        
+        return engine
+    else:
+        return create_engine(
+            url,
+            pool_pre_ping=True,
+            pool_size=config.settings.db.pool_size,
+            max_overflow=config.settings.db.max_overflow,
+        )
+
+engine = setup_sqlite_engine()
 SessionLocal = sessionmaker(bind=engine)
 
 class Base(DeclarativeBase):

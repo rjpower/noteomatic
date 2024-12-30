@@ -15,12 +15,19 @@ class DatabaseSettings(BaseModel):
     port: int = 5432
     name: str = "noteomatic"
     url: Optional[str] = None
+    sqlite_wal: bool = True
+    sqlite_timeout: float = 30.0
+    pool_size: int = 5
+    max_overflow: int = 10
 
     def get_url(self) -> str:
         """Generate SQLAlchemy database URL"""
         if self.url:
             return self.url
 
+        if self.driver.startswith("sqlite"):
+            return f"{self.driver}:///{self.name}"
+            
         return (
             f"{self.driver}://{self.user}:{self.password}@"
             f"{self.host}:{self.port}/{self.name}"

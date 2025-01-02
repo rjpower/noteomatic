@@ -28,6 +28,8 @@ class AppSettings(BaseSettings):
         default="user@example.com:/var/www/html/shared",
         description="SCP target for sharing notes",
     )
+    gemini_api_key: str = ""
+
     public_share_url: str = ""
     build_dir: Path = root_dir / "build"
     raw_dir: Path = root_dir / "raw"

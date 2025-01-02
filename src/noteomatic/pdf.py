@@ -32,7 +32,7 @@ def extract_images_from_pdf(
 
     for page_index in range(len(pdf)):
         page = pdf[page_index]
-        bitmap = page.render(scale=300 / 72)
+        bitmap = page.render(scale=1)
         bitmap = bitmap.to_pil()
 
         # compute the long dimension, assuming the short_dimension is 768*2

@@ -53,6 +53,33 @@
             border-radius: 3px;
             margin-left: 0.5rem;
         }
+        .note-preview {
+            margin: 0.5rem 0;
+            position: relative;
+        }
+        .date {
+            color: #666;
+            font-size: 0.9rem;
+            margin-left: 1rem;
+            font-weight: normal;
+        }
+        .tag {
+            color: #666;
+            text-decoration: none;
+        }
+        .tag:hover {
+            text-decoration: underline;
+        }
+        .preview-text {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0.3rem 0 1rem 1rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
     </style>
     {% block content %}{% endblock %}
 </body>

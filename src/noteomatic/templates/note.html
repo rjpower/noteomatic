@@ -3,7 +3,9 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<p>
+<h1>{{ title }}</h1>
+<p class="metadata">
+    <i>{{ date }}</i> · 
     <a href="#" onclick="shareNote(); return false;">Share this note</a> · 
     <a href="/note/{{ note_id }}/edit">Edit note</a>
 </p>

@@ -48,7 +48,18 @@ def get_note_by_id(note_id: int) -> NoteModel:
 def get_all_notes() -> List[NoteModel]:
     """Get all notes from the database"""
     with get_repo() as repo:
-        return repo.get_all()
+        notes = repo.get_all()
+        for note in notes:
+            # Parse content and get first two paragraphs
+            soup = BeautifulSoup(note.raw_content, "html.parser")
+            preview_paras = []
+            for p in soup.find_all(['p', 'div']):
+                if p.get_text().strip():  # Only include non-empty paragraphs
+                    preview_paras.append(p.get_text().strip())
+                    if len(preview_paras) == 2:
+                        break
+            note.preview_text = '\n'.join(preview_paras) if preview_paras else ''
+        return notes
 
 def count_notes() -> int:
     """Count the number of notes in the database"""
@@ -340,8 +351,10 @@ def upload():
     file.save(str(file_path))
 
     try:
-        # Process the uploaded PDF 
+        # Process the uploaded PDF
         submit_files(file_path, upload_dir, Path(settings.build_dir))
+        # reload the database
+        _init()
         return jsonify({"success": True})
     except Exception as e:
         return (

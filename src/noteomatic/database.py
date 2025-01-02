@@ -15,6 +15,7 @@ from sqlalchemy import (
     create_engine,
     event,
     select,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -181,14 +182,9 @@ class NoteRepository:
 
     def search(self, query: str) -> List[NoteModel]:
         """Search notes using full-text search"""
-        stmt = select(NoteModel).where(
-            NoteModel.id.in_(
-                self.session.query(
-                    "SELECT rowid FROM notes_fts WHERE notes_fts MATCH :query",
-                    {"query": query},
-                ).scalars()
-            )
-        )
+        fts_query = text("SELECT rowid FROM notes_fts WHERE notes_fts MATCH :query")
+        matching_ids = self.session.execute(fts_query, {"query": query}).scalars()
+        stmt = select(NoteModel).where(NoteModel.id.in_(matching_ids))
         return list(self.session.execute(stmt).scalars().all())
 
     def get_by_tag(self, tag: str) -> List[NoteModel]:
@@ -213,6 +209,38 @@ class NoteRepository:
         """Reset the database"""
         Base.metadata.drop_all(self.session.get_bind())
         Base.metadata.create_all(self.session.get_bind())
+        
+        # Create FTS virtual table
+        self.session.execute(text("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts 
+            USING fts5(title, content, tags, content='notes', content_rowid='id')
+        """))
+        
+        # Create triggers to keep FTS table in sync
+        self.session.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+                INSERT INTO notes_fts(rowid, title, content, tags) 
+                VALUES (new.id, new.title, new.content, new.tags);
+            END
+        """))
+        
+        self.session.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+                INSERT INTO notes_fts(notes_fts, rowid, title, content, tags) 
+                VALUES('delete', old.id, old.title, old.content, old.tags);
+            END
+        """))
+        
+        self.session.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+                INSERT INTO notes_fts(notes_fts, rowid, title, content, tags) 
+                VALUES('delete', old.id, old.title, old.content, old.tags);
+                INSERT INTO notes_fts(rowid, title, content, tags) 
+                VALUES (new.id, new.title, new.content, new.tags);
+            END
+        """))
+        
+        self.session.commit()
 
 
 db = SessionLocal()

@@ -1,25 +1,24 @@
-{% extends "base.html" %}
-
-{% block title %}Notes Index{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Notes Index{% endblock %} {% block
+content %}
 <article>
-    <h1>Available Notes</h1>
-    <p><a href="/upload" class="upload-link">Upload New Note</a></p>
-    
-    {% for note in notes %}
-    <section class="note-preview">
-        <h2><a href="/note/{{ note.id }}">{{ note.title }}</a></h2>
-        <p class="date">{{ note.created_at }}</p>
-        {% if note.tags %}
-        <p class="tags">
-            Tags: 
-            {% for tag in note.tags %}
-            <a href="/tag/{{ tag }}" class="tag">{{ tag }}</a>
-            {% endfor %}
-        </p>
-        {% endif %}
-    </section>
-    {% endfor %}
+  <h1>Available Notes</h1>
+  <p><a href="/upload" class="upload-link">Upload New Note</a></p>
+
+  {% for note in notes %}
+  <section class="note-preview">
+    <p>
+      <a href="/note/{{ note.id }}">{{ note.title }}</a>
+      <span class="marginnote">
+        {% for tag in note.tags %}
+        <a href="/tag/{{ tag }}" class="tag">{{ tag }}</a>{% if not loop.last
+        %}, {% endif %} {% endfor %}
+      </span>
+      <span class="date">{{ note.created_at }}</span>
+    </p>
+    {% if note.preview_text %}
+    <p class="preview-text">{{ note.preview_text }}</p>
+    {% endif %}
+  </section>
+  {% endfor %}
 </article>
 {% endblock %}

@@ -9,6 +9,7 @@ from typing import List, Optional
 from litellm import completion
 from pydantic import BaseModel
 
+from .config import settings
 from .pdf import ImageData
 
 
@@ -281,6 +282,7 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
             model=EXTRACTION_MODEL,
             messages=messages,
             num_retries=2,
+            api_key=settings.gemini_api_key,
         )
         .choices[0]
         .message.content
@@ -298,6 +300,7 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
             model=EXTRACTION_MODEL,
             messages=cleanup_messages,
             num_retries=2,
+            api_key=settings.gemini_api_key,
         )
         .choices[0]
         .message.content
@@ -333,6 +336,7 @@ def process_article_tags(article: str, cache_dir: Path) -> str:
             model=EXTRACTION_MODEL,
             messages=messages,
             num_retries=2,
+            api_key=settings.gemini_api_key,
         )
         .choices[0]
         .message.content

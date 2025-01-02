@@ -1,61 +1,54 @@
+import sqlite3
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Generator, List, Optional
 
 from bs4 import BeautifulSoup, Tag
-import sqlite3
-from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, select, event
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    event,
+    select,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from noteomatic import config
 
-def setup_sqlite_engine():
-    """Configure SQLite engine with appropriate settings"""
-    url = config.settings.db.get_url()
-    connect_args = {"timeout": config.settings.db.sqlite_timeout}
-    
-    if url.startswith("sqlite"):
-        engine = create_engine(
-            url,
-            pool_pre_ping=True,
-            connect_args=connect_args,
-            pool_size=config.settings.db.pool_size,
-            max_overflow=config.settings.db.max_overflow,
-        )
-        
+
+class SqliteConnection:
+    def __init__(self):
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=True)
+        self.engine = create_engine(url=f"sqlite:///{self.tmp.name}")
+
         if config.settings.db.sqlite_wal:
             # Enable WAL mode
-            @event.listens_for(engine, "connect")
+            @event.listens_for(self.engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):
                 if isinstance(dbapi_connection, sqlite3.Connection):
                     cursor = dbapi_connection.cursor()
                     cursor.execute("PRAGMA journal_mode=WAL")
                     cursor.execute("PRAGMA busy_timeout=10000")  # 10s timeout
                     cursor.close()
-        
-        return engine
-    else:
-        return create_engine(
-            url,
-            pool_pre_ping=True,
-            pool_size=config.settings.db.pool_size,
-            max_overflow=config.settings.db.max_overflow,
-        )
 
-engine = setup_sqlite_engine()
-SessionLocal = sessionmaker(bind=engine)
+
+connection = SqliteConnection()
+SessionLocal = sessionmaker(bind=connection.engine)
 
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models"""
     pass
 
 
-def parse_html_content(content: str) -> Tag:
+def parse_html_content(content: str):
     """Parse HTML content and return article content."""
     soup = BeautifulSoup(content, "html.parser")
-    article_content = soup.find("article") or soup.find("body") or soup
-    return article_content
+    return soup.find("article") or soup.find("body") or soup
 
 
 class NoteModel(Base):
@@ -78,7 +71,7 @@ class NoteModel(Base):
         return self.content
 
     @property
-    def article_content(self) -> Tag:
+    def article_content(self):
         return parse_html_content(self.content)
 
     @classmethod
@@ -87,13 +80,24 @@ class NoteModel(Base):
         content = file_path.read_text()
         soup = BeautifulSoup(content, "html.parser")
 
-        # Parse metadata
+        # Parse metadata and look for title and tags.
         title_meta = soup.find("meta", {"name": "title"})
-        title = title_meta["content"] if title_meta else file_path.stem
+        title = title_meta["content"] if title_meta else ""
+
+        # if no meta title, look for h1
+        if not title:
+            title = soup.find("h1").text if soup.find("h1") else ""
+        if not title:
+            title = soup.find("h2").text if soup.find("h2") else ""
+        if not title:
+            title = soup.find("h3").text if soup.find("h3") else ""
+
+        if not title:
+            title = file_path.stem
 
         # Parse date for created_at
         date_meta = soup.find("meta", {"name": "date"})
-        created_at = datetime.utcnow()
+        created_at = None
         if date_meta and date_meta["content"]:
             for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
                 try:
@@ -101,6 +105,9 @@ class NoteModel(Base):
                     break
                 except ValueError:
                     continue
+
+        if not created_at:
+            created_at = datetime.fromtimestamp(file_path.stat().st_ctime)
 
         tags_meta = soup.find("meta", {"name": "tags"})
         tags = []
@@ -122,23 +129,23 @@ class NoteModel(Base):
 class NoteRepository:
     """Repository for database operations on notes"""
 
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, session: Session):
+        self.session = session
 
     def get_by_id(self, note_id: int) -> Optional[NoteModel]:
         """Get a note by its ID"""
-        return self.db.get(NoteModel, note_id)
+        return self.session.get(NoteModel, note_id)
 
     def get_all(self) -> List[NoteModel]:
         """Get all notes ordered by creation date"""
         stmt = select(NoteModel).order_by(
             NoteModel.created_at.desc(), NoteModel.title.desc()
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def count(self) -> int:
         """Count total number of notes"""
-        return self.db.query(NoteModel).count()
+        return self.session.query(NoteModel).count()
 
     def create(
         self,
@@ -167,24 +174,27 @@ class NoteRepository:
                 tags=tags,
                 created_at=created_at,
             )
-            self.db.add(note)
-        self.db.commit()
-        self.db.refresh(note)
+            self.session.add(note)
+        self.session.commit()
+        self.session.refresh(note)
         return note
 
     def search(self, query: str) -> List[NoteModel]:
         """Search notes using full-text search"""
-        # This is a basic implementation - you might want to use PostgreSQL's
-        # full-text search capabilities for better results
         stmt = select(NoteModel).where(
-            NoteModel.content.ilike(f"%{query}%") | NoteModel.title.ilike(f"%{query}%")
+            NoteModel.id.in_(
+                self.session.query(
+                    "SELECT rowid FROM notes_fts WHERE notes_fts MATCH :query",
+                    {"query": query},
+                ).scalars()
+            )
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def get_by_tag(self, tag: str) -> List[NoteModel]:
         """Get all notes with a specific tag"""
         stmt = select(NoteModel).where(NoteModel.tags.contains([tag]))
-        return list(self.db.execute(stmt).scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def get_all_tags(self) -> List[str]:
         """Get all unique tags"""
@@ -197,15 +207,19 @@ class NoteRepository:
     def get_by_title(self, title: str) -> Optional[NoteModel]:
         """Get a note by its title"""
         stmt = select(NoteModel).where(NoteModel.title == title)
-        return self.db.execute(stmt).scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
+    def reset(self):
+        """Reset the database"""
+        Base.metadata.drop_all(self.session.get_bind())
+        Base.metadata.create_all(self.session.get_bind())
+
+
+db = SessionLocal()
 
 @contextmanager
 def get_repo() -> Generator[NoteRepository, None, None]:
     """Get repository instance with context management"""
-    db = SessionLocal()
-    # create all tables for convenience with SQlite/in-memory
-    Base.metadata.create_all(engine)
     try:
         yield NoteRepository(db)
     finally:

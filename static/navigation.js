@@ -1,8 +1,5 @@
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Backspace') {
-        // Go back to home page
-        window.location.href = '/';
-    } else if (e.key === 'ArrowLeft') {
+    if (e.key === 'ArrowLeft') {
         const prev = document.getElementById('prev-note');
         if (prev) {
             window.location.href = prev.href;

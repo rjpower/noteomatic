@@ -8,30 +8,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class DatabaseSettings(BaseModel):
     """Database configuration settings"""
 
-    driver: str = "postgresql+psycopg"
-    user: str = "postgres"
-    password: str = "postgres"
-    host: str = "localhost"
-    port: int = 5432
-    name: str = "noteomatic"
-    url: Optional[str] = None
     sqlite_wal: bool = True
     sqlite_timeout: float = 30.0
-    pool_size: int = 5
-    max_overflow: int = 10
-
-    def get_url(self) -> str:
-        """Generate SQLAlchemy database URL"""
-        if self.url:
-            return self.url
-
-        if self.driver.startswith("sqlite"):
-            return f"{self.driver}:///{self.name}"
-            
-        return (
-            f"{self.driver}://{self.user}:{self.password}@"
-            f"{self.host}:{self.port}/{self.name}"
-        )
 
 
 class AppSettings(BaseSettings):
@@ -43,7 +21,7 @@ class AppSettings(BaseSettings):
         env_nested_delimiter="_",
     )
 
-    db: DatabaseSettings
+    db: DatabaseSettings = DatabaseSettings()
 
     root_dir: Path = Path(__file__).parent.parent.parent
     scp_target: str = Field(

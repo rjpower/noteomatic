@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Edit: {{ title }}{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="/static/codemirror/lib/codemirror.min.css">
+    <link rel="stylesheet" href="/static/codemirror/theme/default.min.css">
+    <script src="/static/codemirror/lib/codemirror.min.js"></script>
+    <script src="/static/codemirror/mode/xml.min.js"></script>
+    <script src="/static/codemirror/addon/fold/foldcode.min.js"></script>
+    <script src="/static/codemirror/addon/fold/foldgutter.min.js"></script>
+    <script src="/static/codemirror/addon/fold/xml-fold.min.js"></script>
+    <script src="/static/codemirror/addon/edit/matchbrackets.min.js"></script>
+    <script src="/static/codemirror/addon/edit/matchtags.min.js"></script>
+    <script src="/static/codemirror/addon/edit/closetags.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="{{ url_for('save_note', note_id=note_id) }}">
+    <div class="editor-header">
+        <h1>Editing: {{ title }}</h1>
+        <div class="editor-actions">
+            <button type="submit" class="save-button">Save</button>
+            <a href="{{ url_for('show_note', note_id=note_id) }}" class="cancel-button">Cancel</a>
+        </div>
+    </div>
+    
+    <textarea id="editor" name="content">{{ content }}</textarea>
+</form>
+
+<style>
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.editor-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.CodeMirror {
+    height: 80vh;
+    border: 1px solid #ddd;
+}
+</style>
+
+<script>
+    var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+        mode: "xml",
+        theme: "default",
+        lineNumbers: true,
+        lineWrapping: true,
+        autoCloseTags: true,
+        matchTags: {bothTags: true},
+        extraKeys: {"Ctrl-J": "toMatchingTag"},
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+        foldCode: true,
+    });
+</script>
+{% endblock %}

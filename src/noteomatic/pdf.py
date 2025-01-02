@@ -1,4 +1,5 @@
 import io
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -6,14 +7,19 @@ from typing import List
 import pypdfium2 as pdfium
 from PIL import Image
 
+
 @dataclass
 class ImageData:
     mime_type: str
     content: bytes
 
+# Gemini processes tiles of 768x768 pixels, so we want to ensure that that our
+# A5 paper divides these evenly. This should result in dimension of 768*2 on our
+# short edge, and 768*~1.41 on our long edge.
+
 @dataclass
 class PdfOptions:
-    max_resolution: int = 1600
+    short_dimension: int = 768 * 2
     quality: int = 85
 
 def extract_images_from_pdf(
@@ -23,14 +29,16 @@ def extract_images_from_pdf(
     """Convert PDF pages to image data."""
     image_data_list = []
     pdf = pdfium.PdfDocument(str(pdf_file))
-    max_dimension = options.max_resolution
 
     for page_index in range(len(pdf)):
         page = pdf[page_index]
         bitmap = page.render(scale=300 / 72)
         bitmap = bitmap.to_pil()
 
-        bitmap.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+        # compute the long dimension, assuming the short_dimension is 768*2
+        long_dimension = int(bitmap.height * options.short_dimension / bitmap.width)
+        bitmap = bitmap.resize((options.short_dimension, long_dimension), Image.LANCZOS)
+        logging.info("Computed bitmap, new dimensions: %s", bitmap.size)
 
         img_byte_arr = io.BytesIO()
         bitmap.save(img_byte_arr, format="JPEG", quality=options.quality)

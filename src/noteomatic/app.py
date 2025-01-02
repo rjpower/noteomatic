@@ -17,14 +17,16 @@ from flask import (
     Response,
     abort,
     jsonify,
+    redirect,
     render_template,
     request,
+    url_for,
 )
 from googleapiclient.http import MediaIoBaseDownload
 
 from noteomatic.config import settings
 from noteomatic.database import NoteModel, get_repo
-from noteomatic.lib import get_google_drive_service, process_pdf_files
+from noteomatic.lib import get_google_drive_service, submit_files
 
 # Cache for database connection
 _db_connection = None
@@ -57,16 +59,16 @@ def count_notes() -> int:
 def load_notes_from_dir(dir: Path) -> List[NoteModel]:
     """Load all notes from a directory into the database"""
     notes = []
-    for dirpath, dirnames, filenames in os.walk(dir):
-        for filename in filenames:
-            file = Path(dirpath) / filename
-            if file.is_dir() or file.suffix != ".html":
-                continue
+    with get_repo() as repo:
+        repo.reset()
+        for dirpath, dirnames, filenames in os.walk(dir):
+            for filename in filenames:
+                file = Path(dirpath) / filename
+                if file.is_dir() or file.suffix != ".html":
+                    continue
 
-            content, note = NoteModel.from_file(file, NOTES_DIR)
-            logging.info("Adding/updating note from %s, %s", file, note.title)
+                content, note = NoteModel.from_file(file, NOTES_DIR)
 
-            with get_repo() as repo:
                 note = repo.create(
                     title=note.title,
                     path=note.path,
@@ -136,7 +138,7 @@ def index():
     return render_template("index.html", notes=notes, show_search=True)
 
 
-@app.route("/note/<int:note_id>")
+@app.route("/note/<int:note_id>", methods=["GET"])
 def show_note(note_id):
     """Display a specific note"""
     note = get_note_by_id(note_id)
@@ -155,6 +157,20 @@ def show_note(note_id):
         img["class"] = "graph"
         img["style"] = "max-width: 100%; height: auto;"
         graph_tag.replace_with(img)
+
+    # convert <sidenote> to <span class="sidenote">
+    for sidenote_tag in soup.find_all("sidenote"):
+        sidenote_tag.name = "span"
+        sidenote_tag["class"] = "sidenote"
+
+    # convert <link> to links to the tag page
+    for link_tag in soup.find_all("wiki"):
+        link_tag.name = "a"
+        link_tag["href"] = url_for("show_tag", tag=link_tag.string)
+        link_tag["class"] = "tag-link"
+
+        # put text in the body of the link
+        # link_tag.string.wrap(soup.new_tag("span"))
 
     # compute prev_url and next_url
     note_index = int(note.id)
@@ -324,8 +340,8 @@ def upload():
     file.save(str(file_path))
 
     try:
-        # Process the uploaded PDF
-        process_pdf_files([file_path], upload_dir, Path(settings.build_dir))
+        # Process the uploaded PDF 
+        submit_files(file_path, upload_dir, Path(settings.build_dir))
         return jsonify({"success": True})
     except Exception as e:
         return (
@@ -367,11 +383,45 @@ def sync():
                 print(f"Downloading {file_name}: {int(status.progress() * 100)}%")
 
     # Process the file
-    process_pdf_files(
-        [local_path], Path(app.config["RAW_DIR"]), Path(app.config["BUILD_DIR"])
-    )
+    submit_files(local_path, Path(app.config["RAW_DIR"]), Path(app.config["BUILD_DIR"]))
     return jsonify({"success": True, "message": f"Processed {file_name}"})
 
+
+@app.route("/note/<int:note_id>/edit", methods=["GET"])
+def edit_note(note_id):
+    """Show edit form for a note"""
+    note = get_note_by_id(note_id)
+    if not note:
+        abort(404, "Note not found")
+    
+    return render_template(
+        "edit.html",
+        note_id=note_id,
+        content=note.raw_content,
+        title=note.title
+    )
+
+@app.route("/note/<int:note_id>/save", methods=["POST"])
+def save_note(note_id):
+    """Save changes to a note"""
+    note = get_note_by_id(note_id)
+    if not note:
+        abort(404, "Note not found")
+
+    content = request.form.get("content")
+    if not content:
+        abort(400, "No content provided")
+
+    # update note file on disk and then reload the database
+    note_path = settings.notes_dir / note.path
+    logging.info("Updating note: %s", note_path)
+    with open(note_path, "w") as f:
+        f.write(content)
+
+    # reload the database
+    _init()
+
+    return redirect(url_for("show_note", note_id=note_id))
 
 if __name__ == "__main__":
     app.run(debug=settings.debug)

@@ -3,13 +3,15 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="share-container">
-    <button onclick="shareNote()" class="share-button">Share this note</button>
-</div>
+<p>
+    <a href="#" onclick="shareNote(); return false;">Share this note</a> · 
+    <a href="/note/{{ note_id }}/edit">Edit note</a>
+</p>
 <div id="share-result" style="display: none;"></div>
 
 {{ content|safe }}
 
+<script src="/static/navigation.js" defer></script>
 <script>
 function shareNote() {
     fetch(`/share/{{ note_id }}`, {

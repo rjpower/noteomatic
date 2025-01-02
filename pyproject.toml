@@ -24,6 +24,7 @@ dependencies = [
     "psycopg-binary>=3.2.3",
     "sqlalchemy-utils>=0.41.2",
     "mypy>=1.14.0",
+    "tenacity>=9.0.0",
 ]
 
 [build-system]

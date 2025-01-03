@@ -8,23 +8,6 @@ check_port() {
     fi
 }
 
-# Configure Google Cloud firewall rules
-echo "Configuring Google Cloud firewall rules..."
-gcloud compute firewall-rules create allow-http \
-    --allow tcp:80 \
-    --description="Allow HTTP traffic" \
-    --direction=INGRESS
-
-gcloud compute firewall-rules create allow-https \
-    --allow tcp:443 \
-    --description="Allow HTTPS traffic" \
-    --direction=INGRESS
-
-gcloud compute firewall-rules create allow-app \
-    --allow tcp:8000 \
-    --description="Allow application traffic" \
-    --direction=INGRESS
-
 # Check required ports
 echo "Checking required ports..."
 check_port 80
@@ -32,16 +15,16 @@ check_port 443
 check_port 8000
 
 # Update package list and install required packages
+echo "Installing required packages..."
 sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx netcat
+sudo apt install -y nginx certbot python3-certbot-nginx netcat-traditional
 
-# Get SSL certificate from Let's Encrypt
-sudo certbot --nginx -d memento.labs.ephlabio.com
-
-# Configure Nginx
+# Configure Nginx first without SSL
+echo "Configuring Nginx..."
 sudo cp nginx-ssl.conf /etc/nginx/sites-available/noteomatic
-sudo ln -s /etc/nginx/sites-available/noteomatic /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+sudo ln -sf /etc/nginx/sites-available/noteomatic /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl restart nginx
 
-echo "SSL setup complete! Check https://memento.labs.ephlabio.com:8000"
+echo "Basic setup complete! Now run certbot manually:"
+echo "sudo certbot --nginx -d memento.labs.ephlabio.com"

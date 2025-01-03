@@ -301,13 +301,7 @@ def _make_initial_request(images: List[ImageData]) -> List[dict]:
 def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
     """Helper function to handle two-pass LLM query with cleanup"""
     cache_key = _hash_images(img_batch)
-    cache_file = cache_dir / f"{cache_key}.txt"
-
-    if cache_file.exists():
-        logging.info(f"Cache hit for {cache_key}")
-        return cache_file.read_text()
-
-    logging.info(f"Cache miss for {cache_key}")
+    logging.info(f"Processing batch {cache_key}")
 
     messages = _make_initial_request(img_batch)
 
@@ -341,8 +335,6 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
         .message.content
     )
 
-    if cache_dir:
-        cache_file.write_text(cleaned)
 
     return cleaned
 
@@ -360,12 +352,7 @@ def ai_search(query: str, notes: List[tuple[int, str]], cache_dir: Path) -> str:
         hasher.update(content.encode())
     cache_key = hasher.hexdigest()
 
-    cache_file = cache_dir / f"ai_search_{cache_key}.txt"
-    if cache_file.exists():
-        logging.info(f"Cache hit for AI search {cache_key}")
-        return cache_file.read_text()
-
-    logging.info(f"Cache miss for AI search {cache_key}")
+    logging.info(f"Processing AI search {cache_key}")
 
     # Prepare the context with all notes
     context = "\n\n".join([f"Note ID {note_id}:\n{content}" for note_id, content in notes])
@@ -382,7 +369,6 @@ def ai_search(query: str, notes: List[tuple[int, str]], cache_dir: Path) -> str:
         api_key=settings.gemini_api_key,
     ).choices[0].message.content
 
-    cache_file.write_text(result)
     return result
 
 def process_article_tags(article: str, cache_dir: Path) -> str:
@@ -392,12 +378,7 @@ def process_article_tags(article: str, cache_dir: Path) -> str:
 
     # Create hash of article content for caching
     article_hash = hashlib.sha256(article.encode()).hexdigest()
-    cache_file = cache_dir / f"tags_{article_hash}.txt"
-    if cache_file.exists():
-        logging.info(f"Cache hit for {article_hash}")
-        return cache_file.read_text()
-
-    logging.info(f"Cache miss for {article_hash}")
+    logging.info(f"Processing tags for {article_hash}")
 
     messages = [
         {"role": "system", "content": TAGGING_PROMPT},
@@ -415,7 +396,6 @@ def process_article_tags(article: str, cache_dir: Path) -> str:
         .message.content
     )
 
-    cache_file.write_text(result)
     return result
 
 

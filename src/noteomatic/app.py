@@ -47,11 +47,13 @@ def _get_note_hash(title: str) -> str:
 
 
 def get_note_by_id(note_id: int, user_id: str) -> NoteModel:
-    """Get a note by its ID"""
+    """Get a note by its ID and verify user access"""
     with get_repo(user_id) as repo:
         note = repo.get_by_id(note_id)
         if not note:
             raise KeyError(f"Note with ID {note_id} not found")
+        if note.user_id != user_id:
+            raise PermissionError(f"User {user_id} does not have access to note {note_id}")
         return note
 
 def get_all_notes(user_id: str) -> List[NoteModel]:
@@ -315,9 +317,13 @@ def index():
 @login_required
 def show_note(note_id):
     """Display a specific note"""
-    note = get_note_by_id(note_id, current_user.id)
-    if not note:
+    try:
+    """Display a specific note"""
+        note = get_note_by_id(note_id, current_user.id)
+    except KeyError:
         abort(404, "Note not found")
+    except PermissionError:
+        abort(403, "Access denied")
 
     # Process any graph tags
     soup = bs4.BeautifulSoup(note.raw_content, "html.parser")
@@ -577,11 +583,15 @@ def sync():
 
 
 @app.route("/note/<int:note_id>/edit", methods=["GET"])
+@login_required
 def edit_note(note_id):
     """Show edit form for a note"""
-    note = get_note_by_id(note_id)
-    if not note:
+    try:
+        note = get_note_by_id(note_id, current_user.id)
+    except KeyError:
         abort(404, "Note not found")
+    except PermissionError:
+        abort(403, "Access denied")
     
     return render_template(
         "edit.html",
@@ -591,11 +601,15 @@ def edit_note(note_id):
     )
 
 @app.route("/note/<int:note_id>/save", methods=["POST"])
+@login_required
 def save_note(note_id):
     """Save changes to a note"""
-    note = get_note_by_id(note_id)
-    if not note:
+    try:
+        note = get_note_by_id(note_id, current_user.id)
+    except KeyError:
         abort(404, "Note not found")
+    except PermissionError:
+        abort(403, "Access denied")
 
     content = request.form.get("content")
     if not content:

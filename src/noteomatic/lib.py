@@ -102,9 +102,9 @@ def process_pdf_files(
 
         # extract article again, since tags may have been added
         for i, note in enumerate(tagged_notes):
-        if "<article>" in note and "</article>" in note:
-            note = note.split("<article>")[1].split("</article>")[0]
-            tagged_notes[i] = f"<article>{note}</article>"
+            if "<article>" in note and "</article>" in note:
+                note = note.split("<article>")[1].split("</article>")[0]
+                tagged_notes[i] = f"<article>{note}</article>"
 
     logger.info("Saving %d notes", len(tagged_notes))
     save_notes(tagged_notes, note_dir)

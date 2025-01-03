@@ -29,6 +29,17 @@
                     <img src="/static/icons/photo.svg" alt="Library" class="btn-icon">
                     Library
                 </button>
+                <button onclick="toggleAudioRecording()" class="btn" id="recordButton">
+                    <img src="/static/icons/mic.svg" alt="Microphone" class="btn-icon">
+                    Record Audio
+                </button>
+            </div>
+            <div id="audioRecorder" style="display: none;">
+                <div class="recording-status">
+                    <span id="recordingTime">00:00</span>
+                    <div class="recording-indicator"></div>
+                </div>
+                <audio id="audioPlayback" controls style="display: none;"></audio>
             </div>
 
             <div class="drop-zone">
@@ -113,6 +124,78 @@
             }
             
             input.click();
+        }
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingTimer;
+        let recordingStartTime;
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = document.getElementById('audioPlayback');
+                    audio.src = audioUrl;
+                    audio.style.display = 'block';
+                    
+                    // Convert to MP3 and upload
+                    uploadFile(new File([audioBlob], 'recording.webm', { type: 'audio/webm' }));
+                };
+                
+                mediaRecorder.start();
+                recordingStartTime = Date.now();
+                updateRecordingTime();
+                
+                document.getElementById('audioRecorder').style.display = 'block';
+                document.getElementById('recordButton').innerHTML = `
+                    <img src="/static/icons/stop.svg" alt="Stop" class="btn-icon">
+                    Stop Recording
+                `;
+                
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                alert('Error accessing microphone. Please ensure you have granted permission.');
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                clearInterval(recordingTimer);
+                
+                document.getElementById('recordButton').innerHTML = `
+                    <img src="/static/icons/mic.svg" alt="Microphone" class="btn-icon">
+                    Record Audio
+                `;
+            }
+        }
+        
+        function toggleAudioRecording() {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+        
+        function updateRecordingTime() {
+            recordingTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const seconds = (elapsed % 60).toString().padStart(2, '0');
+                document.getElementById('recordingTime').textContent = `${minutes}:${seconds}`;
+            }, 1000);
         }
 
         function uploadFile(file) {

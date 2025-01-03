@@ -37,6 +37,38 @@
 </article>
 
 <style>
+    #audioRecorder {
+        margin: 1em 0;
+        padding: 1em;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+        
+    .recording-status {
+        display: flex;
+        align-items: center;
+        gap: 1em;
+    }
+        
+    .recording-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: red;
+        animation: pulse 1s infinite;
+    }
+        
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+        
+    #audioPlayback {
+        width: 100%;
+        margin-top: 1em;
+    }
+        
     .search-tabs {
         margin: 1em 0;
         border-bottom: 1px solid #ccc;

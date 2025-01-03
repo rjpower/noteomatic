@@ -170,6 +170,20 @@ def sync_from_drive(
     return new_files
 
 
+def process_audio_file(audio_path: Path, output_path: Path) -> Path:
+    """Process an audio file and convert to a standardized format if needed."""
+    import ffmpeg
+    
+    # Convert to standardized WAV format for processing
+    try:
+        stream = ffmpeg.input(str(audio_path))
+        stream = ffmpeg.output(stream, str(output_path), acodec='pcm_s16le', ac=1, ar=16000)
+        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+        return output_path
+    except ffmpeg.Error as e:
+        logger.error(f"FFmpeg error processing {audio_path}: {e.stderr.decode()}")
+        raise
+
 def convert_image_to_pdf(image_path: Path, output_path: Path) -> Path:
     """Convert an image file to PDF format with metadata."""
     from reportlab.pdfgen import canvas
@@ -272,6 +286,12 @@ def submit_files(
             if source != dest_path:
                 shutil.copy2(source, dest_path)
             sources.append(dest_path)
+        elif source.suffix.lower() in ['.mp3', '.wav', '.m4a', '.ogg']:
+            # Process audio files
+            audio_dest = build_dir / 'audio' / source.with_suffix('.wav').name
+            audio_dest.parent.mkdir(exist_ok=True)
+            process_audio_file(source, audio_dest)
+            sources.append(audio_dest)
     else:
         for filename in glob.glob(str(source)):
             file_path = Path(filename)

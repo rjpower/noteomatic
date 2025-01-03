@@ -14,7 +14,11 @@
             <a href="/">Home</a>
             <a href="/tags">Tags</a>
             <a href="/search">Search</a>
+            <a href="{{ url_for('logout') }}">Logout</a>
         </nav>
+        <div class="welcome-message">
+            Welcome, {{ current_user.name }}! You have {{ note_count }} notes.
+        </div>
         <div class="upload-section">
             <div class="mobile-controls">
                 <button onclick="captureImage('camera')" class="btn">

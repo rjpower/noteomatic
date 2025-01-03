@@ -25,17 +25,17 @@ class User(UserMixin):
     @property
     def notes_dir(self) -> Path:
         """Get the user's notes directory"""
-        return self.user_dir / "notes"
+        return settings.notes_dir / self.id
         
     @property
     def raw_dir(self) -> Path:
         """Get the user's raw files directory"""
-        return self.user_dir / "raw"
+        return settings.raw_dir / self.id
         
     @property
     def build_dir(self) -> Path:
         """Get the user's build directory"""
-        return self.user_dir / "build"
+        return settings.build_dir / self.id
     
     def init_directories(self):
         """Initialize user directories"""
@@ -92,10 +92,14 @@ class User(UserMixin):
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> User:
+    def from_dict(cls, data: dict) -> Optional[User]:
         """Create user from dictionary"""
-        return cls(
+        if not all(k in data for k in ["id", "email", "name"]):
+            return None
+        user = cls(
             user_id=data["id"],
             email=data["email"],
             name=data["name"],
         )
+        user.init_directories()
+        return user

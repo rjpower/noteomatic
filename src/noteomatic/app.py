@@ -5,6 +5,9 @@ import os
 import subprocess
 import tempfile
 import traceback
+from typing import List, Optional
+import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'  # Allow OAuth without HTTPS in development
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -12,6 +15,10 @@ from typing import List
 import bs4
 import graphviz
 from bs4 import BeautifulSoup, Tag
+from flask_login import LoginManager, current_user, login_required, login_user, logout_user
+from flask import flash
+
+from noteomatic.auth import User
 from flask import (
     Flask,
     Response,
@@ -20,6 +27,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 from googleapiclient.http import MediaIoBaseDownload
@@ -38,17 +46,29 @@ def _get_note_hash(title: str) -> str:
     return hashlib.md5(title.encode()).hexdigest()[:8]
 
 
-def get_note_by_id(note_id: int) -> NoteModel:
+def get_note_by_id(note_id: int, user_id: str) -> NoteModel:
     """Get a note by its ID"""
-    with get_repo() as repo:
+    with get_repo(user_id) as repo:
         note = repo.get_by_id(note_id)
         if not note:
             raise KeyError(f"Note with ID {note_id} not found")
         return note
 
-def get_all_notes() -> List[NoteModel]:
+def get_all_notes(user_id: str) -> List[NoteModel]:
     """Get all notes from the database"""
-    with get_repo() as repo:
+    logging.info(f"Getting all notes for user {user_id}")
+    
+    # Load notes from user's directory if they exist
+    user_notes_dir = settings.notes_dir / user_id
+    logging.info(f"Checking user notes directory: {user_notes_dir}")
+    
+    if user_notes_dir.exists():
+        logging.info(f"Found user notes directory, loading notes from {user_notes_dir}")
+        load_notes_from_dir(user_notes_dir, user_id)
+    else:
+        logging.warning(f"User notes directory does not exist: {user_notes_dir}")
+        
+    with get_repo(user_id) as repo:
         notes = repo.get_all()
         for note in notes:
             # Parse content and get first two paragraphs
@@ -68,27 +88,55 @@ def count_notes() -> int:
         return repo.count()
 
 
-def load_notes_from_dir(dir: Path) -> List[NoteModel]:
+def load_notes_from_dir(dir: Path, user_id: Optional[str] = None) -> List[NoteModel]:
     """Load all notes from a directory into the database"""
+    # Extract user_id from directory path if not provided
+    if user_id is None:
+        # Handle both possible directory structures:
+        # 1. build/notes/users/$UID/
+        # 2. build/notes/$UID/
+        try:
+            # Try the direct notes/$UID structure first
+            user_id = dir.relative_to(settings.notes_dir).parts[0]
+        except ValueError:
+            # If that fails, try the notes/users/$UID structure
+            try:
+                user_id = dir.relative_to(settings.users_dir).parts[0]
+            except ValueError:
+                raise ValueError(f"Could not extract user ID from directory path: {dir}")
+    
+    logging.info(f"Loading notes from directory {dir} for user {user_id}")
     notes = []
-    with get_repo() as repo:
-        repo.reset()
+    with get_repo(user_id) as repo:
         for dirpath, dirnames, filenames in os.walk(dir):
+            logging.debug(f"Scanning directory: {dirpath}")
+            logging.debug(f"Found files: {filenames}")
+            
             for filename in filenames:
                 file = Path(dirpath) / filename
                 if file.is_dir() or file.suffix != ".html":
+                    logging.debug(f"Skipping non-HTML file: {file}")
                     continue
+                
+                logging.info(f"Processing note file: {file}")
 
-                content, note = NoteModel.from_file(file, NOTES_DIR)
-
-                note = repo.create(
-                    title=note.title,
-                    path=note.path,
-                    content=content,
-                    tags=note.tags,
-                    created_at=note.created_at or datetime.now(),
-                )
-                notes.append(note)
+                try:
+                    content, note = NoteModel.from_file(file, dir, user_id)
+                    logging.info(f"Created note model from file: {note.title}")
+                    
+                    # Create or update the note, ensuring user_id is set
+                    note = repo.create(
+                        title=note.title,
+                        path=str(file.relative_to(dir)),
+                        content=content,
+                        tags=note.tags,
+                        created_at=note.created_at or datetime.now(),
+                        user_id=user_id  # Explicitly pass user_id
+                    )
+                    logging.info(f"Saved note to database: {note.title}")
+                    notes.append(note)
+                except Exception as e:
+                    logging.error(f"Error processing note file {file}: {str(e)}")
     return notes
 
 NOTES_DIR = settings.notes_dir
@@ -99,17 +147,71 @@ app = Flask(
     static_folder=str(settings.static_dir),
     template_folder=str(settings.template_dir),
 )
+app.secret_key = settings.secret_key
+
+# Setup login manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user from session"""
+    from noteomatic.auth import User
+    from flask import session
+    
+    user_data = session.get('user_data')
+    if not user_data:
+        return None
+        
+    return User.from_dict(user_data)
 
 logging.basicConfig(
     level=settings.log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(filename)s:%(lineno)d - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
 
 
 def _init():
-    logging.info(f"Initializing database from {NOTES_DIR}")
-    load_notes_from_dir(NOTES_DIR)
+    """Initialize database by loading notes from all user directories"""
+    logging.info(f"Initializing database from {settings.users_dir}")
+    
+    # Ensure directories exist
+    settings.users_dir.mkdir(parents=True, exist_ok=True)
+    settings.notes_dir.mkdir(parents=True, exist_ok=True)
+    settings.raw_dir.mkdir(parents=True, exist_ok=True)
+    settings.build_dir.mkdir(parents=True, exist_ok=True)
+    
+    logging.info("Checking directory structure:")
+    logging.info(f"- Users dir: {settings.users_dir} (exists: {settings.users_dir.exists()})")
+    logging.info(f"- Notes dir: {settings.notes_dir} (exists: {settings.notes_dir.exists()})")
+    
+    # Initialize database tables
+    from noteomatic.database import Base, connection
+    Base.metadata.create_all(connection.engine)
+    
+    # Load notes for each user directory
+    if settings.users_dir.exists():
+        user_dirs = list(settings.users_dir.iterdir())
+        logging.info(f"Found {len(user_dirs)} user directories")
+        
+        for user_dir in user_dirs:
+            if user_dir.is_dir():
+                user_id = user_dir.name
+                user_notes_dir = settings.notes_dir / user_id
+                logging.info(f"Processing user {user_id}:")
+                logging.info(f"- User dir: {user_dir} (exists: {user_dir.exists()})")
+                logging.info(f"- Notes dir: {user_notes_dir} (exists: {user_notes_dir.exists()})")
+                
+                if user_notes_dir.exists():
+                    note_files = list(user_notes_dir.glob("**/*.html"))
+                    logging.info(f"- Found {len(note_files)} note files")
+                    load_notes_from_dir(user_notes_dir, user_id)
+                else:
+                    logging.warning(f"Notes directory missing for user {user_id}")
+    else:
+        logging.warning("Users directory does not exist yet")
 
 
 _init()
@@ -172,12 +274,14 @@ def search():
 
 
 @app.route("/browse")
+@login_required
 def browse():
     """List all available notes"""
-    notes = get_all_notes()
+    notes = get_all_notes(current_user.id)
     return render_template("index.html", notes=notes, show_search=True)
 
 @app.route("/", methods=["GET", "POST"])
+@login_required
 def index():
     """Show upload and AI chat interface"""
     if request.method == "POST":
@@ -202,13 +306,16 @@ def index():
             "response": ai_response
         })
         
-    return render_template("upload.html")
+    with get_repo(current_user.id) as repo:
+        note_count = repo.count()
+    return render_template("upload.html", note_count=note_count)
 
 
 @app.route("/note/<int:note_id>", methods=["GET"])
+@login_required
 def show_note(note_id):
     """Display a specific note"""
-    note = get_note_by_id(note_id)
+    note = get_note_by_id(note_id, current_user.id)
     if not note:
         abort(404, "Note not found")
 
@@ -381,6 +488,7 @@ def render_graph():
 
 
 @app.route("/upload", methods=["GET", "POST"])
+@login_required
 def upload():
     """Handle file uploads via drag-and-drop."""
     if request.method != "POST":
@@ -400,16 +508,22 @@ def upload():
             400,
         )
 
-    # Save the uploaded file
-    upload_dir: Path = settings.raw_dir
+    if not current_user.is_authenticated:
+        return jsonify({
+            "success": False, 
+            "error": "Authentication required. Please check src/noteomatic/config.py for OAuth setup."
+        }), 401
+
+    # Save the uploaded file in user's raw directory
+    upload_dir: Path = current_user.raw_dir
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = upload_dir / file.filename
     file.save(str(file_path))
 
     try:
-        # Process the uploaded PDF
-        submit_files(file_path, upload_dir, Path(settings.build_dir))
+        # Process the uploaded PDF into user's notes directory
+        submit_files(file_path, upload_dir, current_user.notes_dir)
         # reload the database
         _init()
         return jsonify({"success": True})
@@ -423,6 +537,7 @@ def upload():
 
 
 @app.route("/sync", methods=["POST"])
+@login_required
 def sync():
     """Handle syncing of selected files from Google Picker."""
     data = request.json
@@ -441,8 +556,11 @@ def sync():
     if mime_type != "application/pdf":
         return jsonify({"error": "Only PDF files are supported"}), 400
 
-    # Download the file
-    local_path = Path(app.config["RAW_DIR"]) / file_name
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Authentication required"}), 401
+
+    # Download the file to user's raw directory
+    local_path = current_user.raw_dir / file_name
     download_request = service.files().get_media(fileId=file_id)
     with open(local_path, "wb") as f:
         downloader = MediaIoBaseDownload(f, download_request)
@@ -452,8 +570,8 @@ def sync():
             if status:
                 print(f"Downloading {file_name}: {int(status.progress() * 100)}%")
 
-    # Process the file
-    submit_files(local_path, Path(app.config["RAW_DIR"]), Path(app.config["BUILD_DIR"]))
+    # Process the file in user's directories
+    submit_files(local_path, current_user.raw_dir, current_user.notes_dir)
     return jsonify({"success": True, "message": f"Processed {file_name}"})
 
 
@@ -492,6 +610,52 @@ def save_note(note_id):
     _init()
 
     return redirect(url_for("show_note", note_id=note_id))
+
+@app.route("/login")
+def login():
+    """Handle login with Google OAuth"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    flow = User.get_google_oauth_flow()
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='select_account'  # Force Google account selection
+    )
+    return redirect(authorization_url)
+
+@app.route("/login/callback")
+def oauth_callback():
+    """Handle Google OAuth callback"""
+    flow = User.get_google_oauth_flow()
+    flow.fetch_token(authorization_response=request.url)
+    
+    credentials = flow.credentials
+    user = User.from_google_credentials(credentials)
+    if user:
+        # Store user data in session
+        session['user_data'] = user.to_dict()
+        login_user(user)
+        return redirect(url_for('index'))
+    else:
+        flash('Login failed')
+        return redirect(url_for('login'))
+
+@app.route("/logout")
+@login_required
+def logout():
+    """Handle logout"""
+    # Clear Flask-Login session
+    logout_user()
+    # Clear Flask session
+    session.clear()
+    # Redirect to login page with cache-control headers
+    response = redirect(url_for('login'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 if __name__ == "__main__":
     app.run(debug=settings.debug)

@@ -58,6 +58,7 @@ class NoteModel(Base):
     __tablename__ = "notes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     path: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -76,7 +77,7 @@ class NoteModel(Base):
         return parse_html_content(self.content)
 
     @classmethod
-    def from_file(cls, file_path: Path, notes_dir: Path) -> tuple[str, "NoteModel"]:
+    def from_file(cls, file_path: Path, notes_dir: Path, user_id: str) -> tuple[str, "NoteModel"]:
         """Create a note instance from a file"""
         content = file_path.read_text()
         soup = BeautifulSoup(content, "html.parser")
@@ -117,12 +118,17 @@ class NoteModel(Base):
 
         # Create note instance
         note = cls(
+            user_id=user_id,  # Ensure user_id is passed through
             path=str(file_path.relative_to(notes_dir)),
             title=title,
             content=content,
             created_at=created_at,
             tags=tags,
         )
+        
+        # Double check user_id is set
+        if not note.user_id:
+            raise ValueError(f"User ID not set for note {title}")
 
         return content, note
 
@@ -130,8 +136,9 @@ class NoteModel(Base):
 class NoteRepository:
     """Repository for database operations on notes"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, user_id: Optional[str] = None):
         self.session = session
+        self.user_id = user_id
 
     def get_by_id(self, note_id: int) -> Optional[NoteModel]:
         """Get a note by its ID"""
@@ -139,14 +146,18 @@ class NoteRepository:
 
     def get_all(self) -> List[NoteModel]:
         """Get all notes ordered by creation date"""
-        stmt = select(NoteModel).order_by(
-            NoteModel.created_at.desc(), NoteModel.title.desc()
-        )
+        stmt = select(NoteModel)
+        if self.user_id:
+            stmt = stmt.where(NoteModel.user_id == self.user_id)
+        stmt = stmt.order_by(NoteModel.created_at.desc(), NoteModel.title.desc())
         return list(self.session.execute(stmt).scalars().all())
 
     def count(self) -> int:
         """Count total number of notes"""
-        return self.session.query(NoteModel).count()
+        query = self.session.query(NoteModel)
+        if self.user_id:
+            query = query.filter(NoteModel.user_id == self.user_id)
+        return query.count()
 
     def create(
         self,
@@ -155,6 +166,7 @@ class NoteRepository:
         content: str,
         tags: List[str],
         created_at: Optional[datetime] = None,
+        user_id: Optional[str] = None,
     ) -> NoteModel:
         """Create a new note or update existing one with same title"""
         existing_note = self.get_by_title(title)
@@ -174,6 +186,7 @@ class NoteRepository:
                 content=content,
                 tags=tags,
                 created_at=created_at,
+                user_id=user_id or self.user_id,  # Use provided user_id or fall back to repo's user_id
             )
             self.session.add(note)
         self.session.commit()
@@ -246,9 +259,9 @@ class NoteRepository:
 db = SessionLocal()
 
 @contextmanager
-def get_repo() -> Generator[NoteRepository, None, None]:
+def get_repo(user_id: Optional[str] = None) -> Generator[NoteRepository, None, None]:
     """Get repository instance with context management"""
     try:
-        yield NoteRepository(db)
+        yield NoteRepository(db, user_id)
     finally:
         db.close()

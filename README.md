@@ -19,13 +19,22 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Configuration
 
-Configuration is managed by Pydantic-Settings; you can use either a .env file or
-environment variables to adjust the configuration. By default you'll only need a
-Gemini API key to load notes:
+Configuration is managed by Pydantic-Settings in `src/noteomatic/config.py`. You can use either a .env file or
+environment variables to adjust the configuration. The required environment variables are:
 
 ```
-export NOTEOMATIC_GEMINI_API_KEY=...
+# Required API keys and secrets
+export NOTEOMATIC_GEMINI_API_KEY=...        # Google Gemini API key for AI features
+export NOTEOMATIC_GOOGLE_CLIENT_ID=...      # Google OAuth client ID for login
+export NOTEOMATIC_GOOGLE_CLIENT_SECRET=...  # Google OAuth client secret for login
+
+# Optional settings
+export NOTEOMATIC_GOOGLE_OAUTH_REDIRECT_URI=http://localhost:5000/login/callback
+export NOTEOMATIC_DEBUG=true                # Enable debug mode
+export NOTEOMATIC_LOG_LEVEL=DEBUG           # Set logging level
 ```
+
+The application will check for these required keys at startup and provide clear error messages if any are missing.
 
 # Running the server
 

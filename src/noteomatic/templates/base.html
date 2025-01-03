@@ -19,6 +19,10 @@
                 </select>
                 <button type="submit">Search</button>
             </form>
+            {% if current_user.is_authenticated %}
+            <span class="user-name">{{ current_user.name }}</span>
+            <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+            {% endif %}
         </div>
         {% if prev_url or next_url %}
         <div id="nav-controls">
@@ -44,6 +48,19 @@
         }
         #search-form {
             margin-left: 1rem;
+        }
+        .user-name {
+            margin-left: 1rem;
+            color: #666;
+            font-style: italic;
+        }
+        .logout-link {
+            margin-left: 1rem;
+            color: #666;
+            text-decoration: none;
+        }
+        .logout-link:hover {
+            text-decoration: underline;
         }
         #search-form input[type="text"] {
             font-size: 1rem;

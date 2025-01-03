@@ -75,8 +75,16 @@ def process_pdf_files(
         for i, result in enumerate(results):
             logger.info("Processing result %d of length %d", i, len(result))
             try:
-                split_result = split_notes(result)
-                all_notes.extend(split_result)
+                logging.debug(f"Processing note batch {i} content: {result[:1000]}...")
+                try:
+                    split_result = split_notes(result)
+                    logging.info(f"Successfully split batch {i} into {len(split_result)} notes")
+                    all_notes.extend(split_result)
+                except Exception as e:
+                    logging.error(f"Error splitting batch {i}")
+                    logging.error(f"Error details: {str(e)}")
+                    logging.error(f"Problematic content: {result}")
+                    raise
             except Exception as e:
                 logger.error(f"Error splitting notes in batch {i}: {str(e)}")
                 logger.error(f"Problem content: {result[:500]}...")

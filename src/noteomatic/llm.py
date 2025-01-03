@@ -315,10 +315,12 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
         )
         first_pass = response.choices[0].message.content
         
-        # Validate HTML structure
+        # Validate HTML structure and log full response for debugging
+        logging.debug(f"First pass LLM response for batch {cache_key}: {first_pass}")
+        
         if "<article>" not in first_pass or "</article>" not in first_pass:
             logging.error(f"Invalid HTML structure in LLM response for batch {cache_key}")
-            logging.error(f"Response content: {first_pass[:500]}...")
+            logging.error(f"Full response content: {first_pass}")
             raise ValueError("LLM response missing article tags")
             
     except Exception as e:
@@ -347,17 +349,28 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
             logging.error(f"Response content: {cleaned[:500]}...")
             raise ValueError("Cleanup response missing article tags")
 
+        # Log cleaned response for debugging
+        logging.debug(f"Cleanup pass response for batch {cache_key}: {cleaned}")
+        
         # Check for valid command JSON
         if "<command>" in cleaned:
             import json
-            for cmd_start in cleaned.split("<command>")[1:]:
-                cmd_content = cmd_start.split("</command>")[0]
+            for i, cmd_start in enumerate(cleaned.split("<command>")[1:], 1):
                 try:
+                    cmd_content = cmd_start.split("</command>")[0]
+                    logging.debug(f"Parsing command {i} in batch {cache_key}: {cmd_content}")
                     json.loads(cmd_content)
                 except json.JSONDecodeError as e:
-                    logging.error(f"Invalid command JSON in batch {cache_key}: {cmd_content}")
-                    logging.error(f"JSON error: {str(e)}")
-                    raise ValueError(f"Invalid command JSON: {str(e)}")
+                    logging.error(f"Invalid command JSON in batch {cache_key}, command {i}")
+                    logging.error(f"Command content: {cmd_content}")
+                    logging.error(f"JSON parse error: {str(e)}")
+                    logging.error(f"Context: {cleaned[:500]}...")
+                    raise ValueError(f"Invalid command JSON in command {i}: {str(e)}")
+                except Exception as e:
+                    logging.error(f"Unexpected error parsing command {i} in batch {cache_key}")
+                    logging.error(f"Error: {str(e)}")
+                    logging.error(f"Command content: {cmd_content}")
+                    raise
 
         return cleaned
 

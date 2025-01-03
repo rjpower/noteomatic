@@ -13,7 +13,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-from noteomatic.llm import extract_notes, process_article_tags
+from noteomatic.llm import extract_notes, process_article_tags, ai_search
 from noteomatic.notes import save_notes, split_notes
 from noteomatic.pdf import PdfOptions, extract_images_from_pdf
 

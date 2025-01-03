@@ -27,6 +27,7 @@ from googleapiclient.http import MediaIoBaseDownload
 from noteomatic.config import settings
 from noteomatic.database import NoteModel, get_repo
 from noteomatic.lib import get_google_drive_service, submit_files
+from noteomatic.llm import ai_search
 
 # Cache for database connection
 _db_connection = None
@@ -115,31 +116,59 @@ _init()
 
 @app.route("/search")
 def search():
-    """Search notes using FTS"""
+    """Search notes using FTS or AI"""
     query = request.args.get("q")
+    mode = request.args.get("mode", "regular")
+    
     if not query:
         return render_template("search.html", error="No query provided")
 
-    with get_repo() as repo:
-        search_results = repo.search(query)
+    if mode == "ai":
+        # Get all notes for AI search
+        with get_repo() as repo:
+            notes = repo.get_all()
+            
+        # Prepare notes with their IDs and content
+        note_data = [(note.id, note.raw_content) for note in notes]
+        
+        # Get AI response
+        cache_dir = settings.build_dir / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        ai_response = ai_search(query, note_data, cache_dir)
+        
+        return render_template(
+            "search.html",
+            query=query,
+            ai_mode=True,
+            ai_response=ai_response
+        )
+    else:
+        # Regular search
+        with get_repo() as repo:
+            search_results = repo.search(query)
 
-    # Extract snippets
-    for note in search_results:
-        content = note.raw_content
-        soup = BeautifulSoup(content, "html.parser")
+        # Extract snippets
+        for note in search_results:
+            content = note.raw_content
+            soup = BeautifulSoup(content, "html.parser")
 
-        # Find the first paragraph that contains the query
-        for p in soup.find_all("p"):
-            if query.lower() in p.text.lower():
-                note.snippet = str(p)
-                break
-        else:
-            # If not found in paragraphs, try other elements
-            snippet = soup.find(["p", "div"])
-            if snippet:
-                note.snippet = str(snippet)
+            # Find the first paragraph that contains the query
+            for p in soup.find_all("p"):
+                if query.lower() in p.text.lower():
+                    note.snippet = str(p)
+                    break
+            else:
+                # If not found in paragraphs, try other elements
+                snippet = soup.find(["p", "div"])
+                if snippet:
+                    note.snippet = str(snippet)
 
-    return render_template("search.html", query=query, results=search_results)
+        return render_template(
+            "search.html",
+            query=query,
+            results=search_results,
+            ai_mode=False
+        )
 
 
 @app.route("/")

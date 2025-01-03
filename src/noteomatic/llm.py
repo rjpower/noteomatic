@@ -195,6 +195,19 @@ USER_PROMPT = """
 Analyze the handwritten notes in the attached images.
 """
 
+AI_SEARCH_PROMPT = """
+You are a note analysis assistant. You have access to a corpus of notes and are tasked with answering questions about their content.
+
+When answering:
+1. Be concise but thorough
+2. Always cite your sources using the provided note IDs in the format: <a href="/note/{note_id}">[Note {note_id}]</a>
+3. If you're unsure, say so
+4. Use HTML formatting for your response, including paragraphs, lists, and quotes as appropriate
+5. If the question cannot be answered from the provided notes, say so clearly
+
+Format your response in clean HTML that will be inserted into a <div class="ai-response">.
+"""
+
 TAGGING_PROMPT = """
 You are a note tagging assistant. 
 
@@ -311,6 +324,44 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
 
     return cleaned
 
+
+def ai_search(query: str, notes: List[tuple[int, str]], cache_dir: Path) -> str:
+    """Process an AI search query against the note corpus."""
+    if not notes:
+        return "<p>No notes available to search.</p>"
+
+    # Create hash of query and notes for caching
+    hasher = hashlib.sha256()
+    hasher.update(query.encode())
+    for note_id, content in notes:
+        hasher.update(str(note_id).encode())
+        hasher.update(content.encode())
+    cache_key = hasher.hexdigest()
+
+    cache_file = cache_dir / f"ai_search_{cache_key}.txt"
+    if cache_file.exists():
+        logging.info(f"Cache hit for AI search {cache_key}")
+        return cache_file.read_text()
+
+    logging.info(f"Cache miss for AI search {cache_key}")
+
+    # Prepare the context with all notes
+    context = "\n\n".join([f"Note ID {note_id}:\n{content}" for note_id, content in notes])
+    
+    messages = [
+        {"role": "system", "content": AI_SEARCH_PROMPT},
+        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+    ]
+
+    result = completion(
+        model=EXTRACTION_MODEL,
+        messages=messages,
+        num_retries=2,
+        api_key=settings.gemini_api_key,
+    ).choices[0].message.content
+
+    cache_file.write_text(result)
+    return result
 
 def process_article_tags(article: str, cache_dir: Path) -> str:
     """Process a single article to add tags and wiki links"""

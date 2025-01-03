@@ -4,24 +4,59 @@
 
 {% block content %}
 <article>
-    <h1>Search Results for "{{ query }}"</h1>
+    <div class="search-tabs">
+        <a href="/search?q={{ query }}" class="tab {% if not ai_mode %}active{% endif %}">Regular Search</a>
+        <a href="/search?q={{ query }}&mode=ai" class="tab {% if ai_mode %}active{% endif %}">AI Search</a>
+    </div>
 
-    {% if error %}
-    <p class="error">{{ error }}</p>
+    {% if ai_mode %}
+        <h1>AI Search Results for "{{ query }}"</h1>
+        <div class="ai-response">
+            {{ ai_response|safe }}
+        </div>
     {% else %}
-    {% if results %}
-    <ul>
-        {% for note in results %}
-        <li>
-            <h2><a href="/note/{{ note.id }}">{{ note.title }}</a></h2>
-            <p class="date">{{ note.date }}</p>
-            <div class="snippet">{{ note.snippet|safe }}</div>
-        </li>
-        {% endfor %}
-    </ul>
-    {% else %}
-    <p>No results found for "{{ query }}".</p>
-    {% endif %}
+        <h1>Search Results for "{{ query }}"</h1>
+        {% if error %}
+        <p class="error">{{ error }}</p>
+        {% else %}
+        {% if results %}
+        <ul>
+            {% for note in results %}
+            <li>
+                <h2><a href="/note/{{ note.id }}">{{ note.title }}</a></h2>
+                <p class="date">{{ note.date }}</p>
+                <div class="snippet">{{ note.snippet|safe }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No results found for "{{ query }}".</p>
+        {% endif %}
+        {% endif %}
     {% endif %}
 </article>
+
+<style>
+    .search-tabs {
+        margin: 1em 0;
+        border-bottom: 1px solid #ccc;
+    }
+    .tab {
+        display: inline-block;
+        padding: 0.5em 1em;
+        text-decoration: none;
+        color: #666;
+        border: 1px solid transparent;
+        margin-bottom: -1px;
+    }
+    .tab.active {
+        color: #111;
+        border: 1px solid #ccc;
+        border-bottom: 1px solid white;
+    }
+    .ai-response {
+        margin: 2em 0;
+        line-height: 1.6;
+    }
+</style>
 {% endblock %}

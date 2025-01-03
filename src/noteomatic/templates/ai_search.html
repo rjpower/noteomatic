@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}AI Search Results{% endblock %}
+
+{% block content %}
+<article>
+    <h1>AI Search Results for "{{ query }}"</h1>
+
+    <div class="ai-response">
+        {{ ai_response|safe }}
+    </div>
+
+    <style>
+        .ai-response {
+            margin: 2em 0;
+            line-height: 1.6;
+        }
+        .ai-response a {
+            color: #666;
+            text-decoration: none;
+            border-bottom: 1px solid #ccc;
+            margin: 0 0.2em;
+        }
+        .ai-response a:hover {
+            color: #111;
+            border-bottom: 1px solid #666;
+        }
+    </style>
+</article>
+{% endblock %}

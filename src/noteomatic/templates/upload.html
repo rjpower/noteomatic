@@ -55,6 +55,61 @@
             background-color: #007558;
         }
 
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .chat-container {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            margin-top: 20px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .chat-input {
+            border-top: 1px solid #ccc;
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input textarea {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: none;
+        }
+
+        .chat-button {
+            padding: 10px 20px;
+            background-color: #009578;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .chat-button:hover {
+            background-color: #007558;
+        }
+
         @media (max-width: 768px) {
             .mobile-controls {
                 display: block;
@@ -63,6 +118,19 @@
             .drop-zone {
                 height: 150px;
                 font-size: 16px;
+            }
+
+            .chat-container {
+                height: 70vh;
+            }
+
+            .chat-input textarea {
+                font-size: 18px;
+            }
+
+            .chat-button {
+                padding: 12px 24px;
+                font-size: 18px;
             }
         }
 
@@ -74,10 +142,27 @@
     </style>
 </head>
 <body>
-    <h1>Upload PDF</h1>
-    <div class="drop-zone">
-        <span class="drop-zone__prompt">Drop PDF or image file here or click to upload</span>
-        <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic" capture>
+    <h1>NoteOmatic</h1>
+    
+    <div class="container">
+        <div class="section">
+            <h2>Upload Notes</h2>
+            <div class="drop-zone">
+                <span class="drop-zone__prompt">Drop PDF or image file here or click to upload</span>
+                <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic" capture>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>AI Chat</h2>
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages"></div>
+                <div class="chat-input">
+                    <textarea id="user-input" placeholder="Ask me anything about your notes..." rows="3"></textarea>
+                    <button onclick="sendMessage()" class="chat-button">Send</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <!-- Mobile-specific controls -->

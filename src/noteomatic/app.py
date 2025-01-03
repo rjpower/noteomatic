@@ -171,11 +171,16 @@ def search():
         )
 
 
-@app.route("/")
-def index():
+@app.route("/browse")
+def browse():
     """List all available notes"""
     notes = get_all_notes()
     return render_template("index.html", notes=notes, show_search=True)
+
+@app.route("/")
+def index():
+    """Show upload and AI chat interface"""
+    return render_template("upload.html")
 
 
 @app.route("/note/<int:note_id>", methods=["GET"])

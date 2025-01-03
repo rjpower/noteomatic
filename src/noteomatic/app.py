@@ -226,8 +226,8 @@ def search():
         return render_template("search.html", error="No query provided")
 
     if mode == "ai":
-        # Get all notes for AI search
-        with get_repo() as repo:
+        # Get all notes for AI search, restricted to current user
+        with get_repo(current_user.id) as repo:
             notes = repo.get_all()
             
         # Prepare notes with their IDs and content
@@ -289,8 +289,8 @@ def index():
         if not message:
             return jsonify({"error": "No message provided"}), 400
             
-        # Get all notes for AI search
-        with get_repo() as repo:
+        # Get all notes for AI search, restricted to current user
+        with get_repo(current_user.id) as repo:
             notes = repo.get_all()
             
         # Prepare notes with their IDs and content

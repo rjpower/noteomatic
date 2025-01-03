@@ -288,18 +288,18 @@ def submit_files(
     source = source.expanduser()
 
     # Process source files
-    sources = []
+    pdf_sources = []
     if source.is_file():
         dest_path = raw_dir / source.name
         if source.suffix.lower() in ['.png', '.jpg', '.jpeg', '.heic']:
             # Convert image to PDF
             pdf_path = dest_path.with_suffix('.pdf')
             convert_image_to_pdf(source, pdf_path)
-            sources.append(pdf_path)
+            pdf_sources.append(pdf_path)
         elif source.suffix.lower() == '.pdf':
             if source != dest_path:
                 shutil.copy2(source, dest_path)
-            sources.append(dest_path)
+            pdf_sources.append(dest_path)
         elif source.suffix.lower() in ['.mp3', '.wav', '.m4a', '.ogg', '.webm']:
             # Process audio files
             logger.info(f"Processing audio file: {source}")
@@ -307,7 +307,7 @@ def submit_files(
             logger.info(f"Audio destination: {audio_dest}")
             audio_dest.parent.mkdir(exist_ok=True)
             process_audio_file(source, audio_dest)
-            sources.append(audio_dest)
+            return [audio_dest]  # Return early for audio files
     else:
         for filename in glob.glob(str(source)):
             file_path = Path(filename)
@@ -323,7 +323,7 @@ def submit_files(
                     shutil.copy2(file_path, dest_path)
                 sources.append(dest_path)
 
-    if sources:
-        process_pdf_files(sources, raw_dir, build_dir)
+    if pdf_sources:
+        process_pdf_files(pdf_sources, raw_dir, build_dir)
 
-    return sources
+    return pdf_sources

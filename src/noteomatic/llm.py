@@ -28,11 +28,28 @@ COMMAND_TYPES = {
 }
 
 SYSTEM_PROMPT = """
-You are a note analysis assistant. You are an expert at deciphering handwritten
-notes and converting them to semantic HTML using the Tufte CSS framework. You are
-also highly skilled at interpreting multimodal data including photographs, videos,
-diagrams, charts, and other visual content, providing detailed and accurate
-descriptions of their contents and meaning.
+You are a note analysis assistant. You MUST follow these formatting rules exactly.
+Your response MUST ALWAYS be valid HTML wrapped in <article> tags.
+
+REQUIRED FORMAT:
+<article>
+<h1>Title</h1>
+<p>Content...</p>
+<meta name="title" content="Note Title">
+<meta name="date" content="YYYY-MM-DD">
+</article>
+
+You are an expert at deciphering handwritten notes and converting them to semantic 
+HTML using the Tufte CSS framework. You are also highly skilled at interpreting 
+multimodal data including photographs, videos, diagrams, charts, and other visual 
+content, providing detailed and accurate descriptions of their contents and meaning.
+
+CRITICAL: Your response MUST:
+1. Start with <article> and end with </article>
+2. Include exactly one <h1> title
+3. Have both title and date meta tags
+4. Use proper HTML nesting
+5. Never include <html>, <body> or <head> tags
 
 ## Content Analysis:
 
@@ -304,34 +321,71 @@ def _make_initial_request(images: List[ImageData]) -> List[dict]:
     return messages
 
 
-def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
+def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData], max_retries: int = 2):
     """Helper function to handle two-pass LLM query with cleanup"""
     cache_key = _hash_images(img_batch)
     logging.info(f"Processing batch {cache_key}")
 
     messages = _make_initial_request(img_batch)
+    
+    def validate_response(content: str) -> bool:
+        """Validate basic HTML structure requirements"""
+        required_elements = [
+            ("<article>", "</article>"),
+            ("<h1>", "</h1>"),
+            ('<meta name="title"', ">"),
+            ('<meta name="date"', ">")
+        ]
+        return all(start in content and end in content 
+                  for start, end in required_elements)
 
-    try:
-        # First pass - get initial notes
-        response = completion(
-            model=EXTRACTION_MODEL,
-            messages=messages,
-            num_retries=2,
-            api_key=settings.gemini_api_key,
-        )
-        first_pass = response.choices[0].message.content
-        
-        # Validate HTML structure and log full response for debugging
-        logging.debug(f"First pass LLM response for batch {cache_key}: {first_pass}")
-        
-        if "<article>" not in first_pass or "</article>" not in first_pass:
-            logging.error(f"Invalid HTML structure in LLM response for batch {cache_key}")
-            logging.error(f"Full response content: {first_pass}")
-            raise ValueError("LLM response missing article tags")
+    retry_count = 0
+
+    while retry_count < max_retries:
+        try:
+            # First pass - get initial notes
+            response = completion(
+                model=EXTRACTION_MODEL,
+                messages=messages,
+                num_retries=2,
+                api_key=settings.gemini_api_key,
+            )
+            first_pass = response.choices[0].message.content
             
-    except Exception as e:
-        logging.error(f"Error in first pass LLM processing for batch {cache_key}: {str(e)}")
-        raise
+            # Validate HTML structure and log full response for debugging
+            logging.debug(f"First pass LLM response for batch {cache_key}: {first_pass}")
+            
+            if not validate_response(first_pass):
+                retry_count += 1
+                logging.warning(f"Invalid response format (attempt {retry_count}/{max_retries})")
+                
+                # Add correction prompt for retry
+                messages.append({"role": "user", "content": f"""
+Your previous response did not follow the required format. Here was your response:
+
+{first_pass}
+
+Please provide a new response that STRICTLY follows this format:
+<article>
+<h1>Title</h1>
+<p>Content...</p>
+<meta name="title" content="Note Title">
+<meta name="date" content="YYYY-MM-DD">
+</article>
+"""})
+                continue
+                
+            break
+                
+        except Exception as e:
+            logging.error(f"Error in first pass LLM processing for batch {cache_key}: {str(e)}")
+            if retry_count < max_retries - 1:
+                retry_count += 1
+                continue
+            raise
+            
+    if retry_count == max_retries:
+        raise ValueError(f"Failed to get valid response after {max_retries} attempts")
 
     # Second pass - cleanup with original results
     cleanup_messages = [

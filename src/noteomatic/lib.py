@@ -174,11 +174,25 @@ def process_audio_file(audio_path: Path, output_path: Path) -> Path:
     """Process an audio file and convert to a standardized format if needed."""
     import ffmpeg
     
+    logger.info(f"Processing audio file: {audio_path}")
+    logger.info(f"Output path: {output_path}")
+    logger.info(f"Input file format: {audio_path.suffix}")
+    
     # Convert to standardized WAV format for processing
     try:
+        # Get input file information
+        probe = ffmpeg.probe(str(audio_path))
+        audio_info = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
+        if audio_info:
+            logger.info(f"Input audio format: {audio_info.get('codec_name', 'unknown')}")
+            logger.info(f"Input sample rate: {audio_info.get('sample_rate', 'unknown')} Hz")
+            logger.info(f"Input channels: {audio_info.get('channels', 'unknown')}")
+        
         stream = ffmpeg.input(str(audio_path))
         stream = ffmpeg.output(stream, str(output_path), acodec='pcm_s16le', ac=1, ar=16000)
+        logger.info("Starting FFmpeg conversion...")
         ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+        logger.info("FFmpeg conversion completed successfully")
         return output_path
     except ffmpeg.Error as e:
         logger.error(f"FFmpeg error processing {audio_path}: {e.stderr.decode()}")
@@ -286,9 +300,11 @@ def submit_files(
             if source != dest_path:
                 shutil.copy2(source, dest_path)
             sources.append(dest_path)
-        elif source.suffix.lower() in ['.mp3', '.wav', '.m4a', '.ogg']:
+        elif source.suffix.lower() in ['.mp3', '.wav', '.m4a', '.ogg', '.webm']:
             # Process audio files
+            logger.info(f"Processing audio file: {source}")
             audio_dest = build_dir / 'audio' / source.with_suffix('.wav').name
+            logger.info(f"Audio destination: {audio_dest}")
             audio_dest.parent.mkdir(exist_ok=True)
             process_audio_file(source, audio_dest)
             sources.append(audio_dest)

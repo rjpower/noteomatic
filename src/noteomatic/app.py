@@ -508,11 +508,16 @@ def upload():
         return jsonify({"success": False, "error": "No file selected"}), 400
 
     allowed_extensions = {'.pdf', '.png', '.jpg', '.jpeg', '.heic', '.mp3', '.wav', '.m4a', '.ogg', '.webm'}
+    file_ext = Path(file.filename).suffix.lower()
     if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
+        logging.error(f"Invalid file type: {file_ext}")
         return (
-            jsonify({"success": False, "error": "Only PDF and image files (PNG, JPG, HEIC) are allowed"}),
+            jsonify({"success": False, "error": "Only PDF, image, and audio files (PDF, PNG, JPG, HEIC, MP3, WAV, M4A, OGG, WEBM) are allowed"}),
             400,
         )
+
+    logging.info(f"Processing uploaded file: {file.filename}")
+    logging.info(f"File type: {file_ext}")
 
     if not current_user.is_authenticated:
         return jsonify({

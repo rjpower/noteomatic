@@ -306,8 +306,26 @@ def submit_files(
             audio_dest = build_dir / 'audio' / source.with_suffix('.wav').name
             logger.info(f"Audio destination: {audio_dest}")
             audio_dest.parent.mkdir(exist_ok=True)
-            process_audio_file(source, audio_dest)
-            return [audio_dest]  # Return early for audio files
+            
+            # Convert audio to standard format
+            processed_audio = process_audio_file(source, audio_dest)
+            
+            # Create an ImageData-like object for the audio file
+            from noteomatic.pdf import ImageData
+            audio_data = ImageData(
+                mime_type="audio/wav",
+                content=processed_audio.read_bytes()
+            )
+            
+            # Process through Gemini
+            results = extract_notes([audio_data], cache_dir=build_dir / "cache")
+            if results:
+                # Save transcribed notes
+                notes_dir = build_dir / "notes"
+                notes_dir.mkdir(exist_ok=True)
+                save_notes(results, notes_dir)
+                
+            return [processed_audio]
     else:
         for filename in glob.glob(str(source)):
             file_path = Path(filename)

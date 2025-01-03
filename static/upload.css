@@ -1,0 +1,207 @@
+:root {
+  --primary-color: #2196F3;
+  --primary-dark: #1976D2;
+  --background-color: #ffffff;
+  --text-color: #333333;
+  --border-color: #e0e0e0;
+  --success-color: #4CAF50;
+  --error-color: #f44336;
+  --spacing-unit: 1rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  background: var(--background-color);
+}
+
+.mobile-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--primary-color);
+  margin-bottom: var(--spacing-unit);
+  border-radius: 8px;
+}
+
+.mobile-nav a {
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.mobile-nav a:hover {
+  background: var(--primary-dark);
+  border-radius: 4px;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--spacing-unit);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-section {
+  margin-bottom: var(--spacing-unit);
+}
+
+.mobile-controls {
+  display: flex;
+  gap: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+}
+
+.btn:hover {
+  background: var(--primary-dark);
+}
+
+.btn-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  filter: brightness(0) invert(1);
+}
+
+.drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  margin-bottom: var(--spacing-unit);
+}
+
+.drop-zone:hover {
+  border-color: var(--primary-color);
+}
+
+.drop-zone--over {
+  border-style: solid;
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.chat-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-container {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+  max-height: 80vh;
+  min-height: 100px;
+  position: relative; /* Option 2: Add positioning context */
+}
+
+.chat-messages {
+  overflow-y: auto;
+  padding: var(--spacing-unit);
+  max-height: calc(80vh - 180px); /* Account for nav bar, mobile controls, and input area */
+  height: auto;
+}
+
+.message {
+  max-width: 80%;
+  margin-bottom: var(--spacing-unit);
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+.user-message {
+  margin-left: auto;
+  background: var(--primary-color);
+  color: white;
+}
+
+.ai-message {
+  margin-right: auto;
+  background: #f5f5f5;
+}
+
+.chat-input {
+  padding: var(--spacing-unit);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-input textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1rem;
+  resize: none;
+  font-family: inherit;
+  min-height: 2rem;
+}
+
+.chat-input .btn {
+  align-self: flex-end;
+  width: auto;
+  padding: 0.3rem 1rem;
+  font-size: 0.9rem;
+}
+
+.status {
+  text-align: center;
+  padding: var(--spacing-unit);
+  color: var(--text-color);
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 0.5rem;
+  }
+  
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .drop-zone {
+    display: none;
+  }
+  
+  .chat-input {
+    padding: 0.5rem;
+  }
+  
+  .message {
+    max-width: 90%;
+  }
+}

@@ -1,304 +1,107 @@
-{% extends "base.html" %}
-
-{% block title %}Upload Notes{% endblock %}
-
-{% block head %}
-<style>
-        .drop-zone {
-            width: 100%;
-            max-width: 600px;
-            height: 200px;
-            padding: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            font-size: 20px;
-            font-weight: 500;
-            cursor: pointer;
-            color: #777;
-            border: 4px dashed #009578;
-            border-radius: 10px;
-            margin: 20px auto;
-        }
-
-        .drop-zone--over {
-            border-style: solid;
-            background-color: rgba(0, 149, 120, 0.1);
-        }
-
-        .drop-zone__input {
-            display: none;
-        }
-
-        .mobile-controls {
-            display: none;
-            width: 100%;
-            max-width: 600px;
-            margin: 20px auto;
-            text-align: center;
-        }
-
-        .mobile-btn {
-            background-color: #009578;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            margin: 0 10px;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        .mobile-btn:active {
-            background-color: #007558;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .section {
-            margin-bottom: 40px;
-        }
-
-        .chat-container {
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            margin-top: 20px;
-            height: 400px;
-            background: #f9f9f9;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chat-messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-        
-        .user-message, .ai-message {
-            margin: 10px 0;
-            padding: 10px 15px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        
-        .user-message {
-            background: #e3f2fd;
-            margin-left: auto;
-        }
-        
-        .ai-message {
-            background: white;
-            margin-right: auto;
-            border: 1px solid #eee;
-        }
-
-        .chat-input {
-            border-top: 1px solid #ccc;
-            padding: 15px;
-            display: flex;
-            gap: 10px;
-        }
-
-        .chat-input textarea {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-            resize: none;
-        }
-
-        .chat-button {
-            padding: 10px 20px;
-            background-color: #009578;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .chat-button:hover {
-            background-color: #007558;
-        }
-
-        @media (max-width: 768px) {
-            .mobile-controls {
-                display: block;
-            }
-            
-            .drop-zone {
-                height: 150px;
-                font-size: 16px;
-            }
-
-            .chat-container {
-                height: 70vh;
-            }
-
-            .chat-input textarea {
-                font-size: 18px;
-            }
-
-            .chat-button {
-                padding: 12px 24px;
-                font-size: 18px;
-            }
-        }
-
-        #status {
-            text-align: center;
-            margin-top: 20px;
-            color: #666;
-        }
-    </style>
-{% endblock %}
-
-{% block content %}
-<article>
-    <h1>Upload Notes</h1>
-    
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Notes</title>
+    <link rel="stylesheet" href="/static/upload.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+</head>
+<body>
     <div class="container">
+        <nav class="mobile-nav">
+            <a href="/browse">Browse</a>
+            <a href="/">Home</a>
+            <a href="/tags">Tags</a>
+            <a href="/search">Search</a>
+        </nav>
+        <div class="upload-section">
+            <div class="mobile-controls">
+                <button onclick="captureImage('camera')" class="btn">
+                    <img src="/static/icons/camera.svg" alt="Camera" class="btn-icon">
+                    Take Photo
+                </button>
+                <button onclick="captureImage('library')" class="btn">
+                    <img src="/static/icons/photo.svg" alt="Library" class="btn-icon">
+                    Library
+                </button>
+            </div>
 
-        <div class="section">
-            <h2>Upload Notes</h2>
             <div class="drop-zone">
                 <span class="drop-zone__prompt">Drop PDF or image file here or click to upload</span>
-                <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic" capture>
+                <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic" hidden>
             </div>
         </div>
 
-        <div class="section">
-            <h2>AI Chat</h2>
+        <div class="chat-section">
             <div class="chat-container">
                 <div id="chat-messages" class="chat-messages"></div>
                 <div class="chat-input">
-                    <textarea id="user-input" placeholder="Ask me anything about your notes..." rows="3"></textarea>
-                    <button onclick="sendMessage()" class="chat-button">Send</button>
+                    <textarea id="user-input" placeholder="Ask me anything about your notes..." rows="1"></textarea>
+                    <button onclick="sendMessage()" class="btn">Send</button>
                 </div>
             </div>
         </div>
+
+        <div id="status" class="status"></div>
     </div>
-    
-    <!-- Mobile-specific controls -->
-    <div class="mobile-controls">
-        <button onclick="captureImage('camera')" class="mobile-btn">Take Photo</button>
-        <button onclick="captureImage('library')" class="mobile-btn">Choose from Library</button>
-    </div>
-    <div id="status"></div>
-</article>
 
-<script>
-    // Chat functionality
-    const chatMessages = document.getElementById('chat-messages');
-    const userInput = document.getElementById('user-input');
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
         
-    function addMessage(message, isUser = true) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = isUser ? 'user-message' : 'ai-message';
-        messageDiv.innerHTML = message;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-        
-    async function sendMessage() {
-        const message = userInput.value.trim();
-        if (!message) return;
-            
-        // Add user message to chat
-        addMessage(message);
-            
-        // Clear input
-        userInput.value = '';
-            
-        try {
-            const response = await fetch('/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message }),
-            });
-                
-            const data = await response.json();
-            if (data.success) {
-                addMessage(data.response, false);
-            } else {
-                addMessage('Error: ' + data.error, false);
-            }
-        } catch (error) {
-            addMessage('Error sending message: ' + error, false);
-        }
-    }
-        
-    // Handle Enter key
-    userInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-        document.querySelectorAll(".drop-zone").forEach(dropZone => {
-            const input = dropZone.querySelector(".drop-zone__input");
-
-            dropZone.addEventListener("click", e => {
-                input.click();
-            });
-
-            input.addEventListener("change", e => {
-                if (input.files.length) {
-                    uploadFile(input.files[0]);
-                }
-            });
-
-            dropZone.addEventListener("dragover", e => {
-                e.preventDefault();
-                dropZone.classList.add("drop-zone--over");
-            });
-
-            ["dragleave", "dragend"].forEach(type => {
-                dropZone.addEventListener(type, e => {
-                    dropZone.classList.remove("drop-zone--over");
-                });
-            });
-
-            dropZone.addEventListener("drop", e => {
-                e.preventDefault();
-                dropZone.classList.remove("drop-zone--over");
-
-                if (e.dataTransfer.files.length) {
-                    const file = e.dataTransfer.files[0];
-                    const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/heic"];
-                    if (allowedTypes.includes(file.type)) {
-                        uploadFile(file);
-                    } else {
-                        document.getElementById("status").textContent = "Please upload a PDF file";
-                    }
-                }
-            });
-        });
-
-        // Check if we're on a mobile device
         function isMobile() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+                || window.innerWidth <= 600;
         }
 
-        // Show/hide mobile controls based on device
-        window.addEventListener('load', function() {
-            if (isMobile()) {
-                document.querySelector('.mobile-controls').style.display = 'block';
+        function addMessage(message, isUser = true) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+            if (isUser) {
+                messageDiv.textContent = message;
+            } else {
+                const temp = document.createElement('div');
+                temp.innerHTML = DOMPurify.sanitize(message);
+                messageDiv.innerHTML = temp.innerHTML;
             }
-        });
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
-        // Handle camera/library capture
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+            
+            addMessage(message);
+            userInput.value = '';
+            
+            try {
+                const response = await fetch('/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                
+                const data = await response.json();
+                const responseText = data.success ? data.response : 'Error: ' + data.error;
+                
+                // Create a temporary div to safely parse HTML
+                const temp = document.createElement('div');
+                temp.innerHTML = DOMPurify.sanitize(responseText);
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message ai-message';
+                messageDiv.innerHTML = temp.innerHTML;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (error) {
+                addMessage('Error sending message: ' + error, false);
+            }
+        }
+
         function captureImage(source) {
-            const input = document.querySelector(".drop-zone__input");
+            const input = document.querySelector('.drop-zone__input');
             input.removeAttribute('capture');
             
             if (source === 'camera') {
@@ -310,26 +113,69 @@
 
         function uploadFile(file) {
             const formData = new FormData();
-            formData.append("pdf", file);
+            formData.append('pdf', file);
             
-            document.getElementById("status").textContent = "Uploading...";
+            const status = document.getElementById('status');
+            status.textContent = 'Uploading...';
 
-            fetch("/upload", {
-                method: "POST",
+            fetch('/upload', {
+                method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
+                status.textContent = data.success ? 'Upload successful! Redirecting...' : 'Error: ' + data.error;
                 if (data.success) {
-                    document.getElementById("status").textContent = "Upload successful! Redirecting...";
-                    window.location.href = "/";
-                } else {
-                    document.getElementById("status").textContent = "Error: " + data.error;
+                    setTimeout(() => window.location.href = '/', 1000);
                 }
             })
             .catch(error => {
-                document.getElementById("status").textContent = "Error uploading file: " + error;
+                status.textContent = 'Error uploading file: ' + error;
             });
         }
+
+        // Event Listeners
+        window.addEventListener('load', () => {
+            if (isMobile()) {
+                document.querySelector('.drop-zone').style.display = 'none';
+            }
+            userInput.focus();
+        });
+
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        const dropZone = document.querySelector('.drop-zone');
+        const dropInput = dropZone.querySelector('.drop-zone__input');
+
+        dropZone.addEventListener('click', () => dropInput.click());
+        dropInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                uploadFile(e.target.files[0]);
+            }
+        });
+
+        ['dragover', 'dragleave', 'dragend', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.toggle('drop-zone--over', eventName === 'dragover');
+                
+                if (eventName === 'drop') {
+                    const file = e.dataTransfer.files[0];
+                    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/heic'];
+                    
+                    if (allowedTypes.includes(file.type)) {
+                        uploadFile(file);
+                    } else {
+                        document.getElementById('status').textContent = 'Please upload a PDF or image file';
+                    }
+                }
+            });
+        });
     </script>
-{% endblock %}
+</body>
+</html>

@@ -8,6 +8,23 @@ check_port() {
     fi
 }
 
+# Configure Google Cloud firewall rules
+echo "Configuring Google Cloud firewall rules..."
+gcloud compute firewall-rules create allow-http \
+    --allow tcp:80 \
+    --description="Allow HTTP traffic" \
+    --direction=INGRESS
+
+gcloud compute firewall-rules create allow-https \
+    --allow tcp:443 \
+    --description="Allow HTTPS traffic" \
+    --direction=INGRESS
+
+gcloud compute firewall-rules create allow-app \
+    --allow tcp:8000 \
+    --description="Allow application traffic" \
+    --direction=INGRESS
+
 # Check required ports
 echo "Checking required ports..."
 check_port 80

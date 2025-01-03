@@ -148,22 +148,77 @@ def sync_from_drive(
 
 
 def convert_image_to_pdf(image_path: Path, output_path: Path) -> Path:
-    """Convert an image file to PDF format."""
+    """Convert an image file to PDF format with metadata."""
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    
     temp_path = None
     try:
         with Image.open(image_path) as img:
+            # Get image dimensions
+            img_width, img_height = img.size
+            
+            # Extract EXIF data
+            exif_data = []
+            if hasattr(img, '_getexif') and img._getexif():
+                from PIL.ExifTags import TAGS
+                exif = {
+                    TAGS[k]: v
+                    for k, v in img._getexif().items()
+                    if k in TAGS and isinstance(v, (str, int, float))
+                }
+                for tag, value in exif.items():
+                    exif_data.append(f"{tag}: {value}")
+            
+            # Add basic image info
+            exif_data.extend([
+                f"Filename: {image_path.name}",
+                f"Format: {img.format}",
+                f"Mode: {img.mode}",
+                f"Size: {img_width}x{img_height}",
+                f"Created: {datetime.fromtimestamp(image_path.stat().st_ctime).strftime('%Y-%m-%d %H:%M:%S')}"
+            ])
+            
             # Convert HEIC or handle color modes
             if image_path.suffix.lower() == '.heic' or img.mode not in ['RGB', 'L']:
-                # Convert to RGB mode and save as PNG
                 img = img.convert('RGB')
                 temp_path = image_path.with_suffix('.png')
                 img.save(temp_path, 'PNG')
                 image_path = temp_path
 
-        # Convert to PDF
-        with open(output_path, "wb") as pdf_file:
-            pdf_file.write(img2pdf.convert(str(image_path)))
-        
+            # Create PDF with image and metadata
+            c = canvas.Canvas(str(output_path), pagesize=letter)
+            
+            # Calculate image placement to maintain aspect ratio
+            max_width = letter[0] - 2*inch  # 1 inch margins
+            max_height = letter[1] - 3*inch  # Extra margin for metadata
+            
+            # Scale image to fit within margins while maintaining aspect ratio
+            width_ratio = max_width / img_width
+            height_ratio = max_height / img_height
+            scale = min(width_ratio, height_ratio)
+            
+            scaled_width = img_width * scale
+            scaled_height = img_height * scale
+            
+            # Center image horizontally
+            x = (letter[0] - scaled_width) / 2
+            y = letter[1] - inch - scaled_height  # Position from top with margin
+            
+            # Add image
+            c.drawImage(str(image_path), x, y, width=scaled_width, height=scaled_height)
+            
+            # Add metadata text
+            c.setFont("Helvetica", 8)
+            text_y = y - 12  # Start text below image
+            for line in exif_data:
+                if text_y > inch:  # Ensure we don't write below bottom margin
+                    c.drawString(inch, text_y, line)
+                    text_y -= 10
+            
+            c.save()
+            
         return output_path
     finally:
         # Clean up temporary file if created

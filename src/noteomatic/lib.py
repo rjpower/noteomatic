@@ -105,6 +105,9 @@ def process_pdf_files(
             if "<article>" in note and "</article>" in note:
                 note = note.split("<article>")[1].split("</article>")[0]
                 tagged_notes[i] = f"<article>{note}</article>"
+    except Exception as e:
+        logger.error("Error during tag processing: %s", str(e))
+        raise
 
     logger.info("Saving %d notes", len(tagged_notes))
     save_notes(tagged_notes, note_dir)

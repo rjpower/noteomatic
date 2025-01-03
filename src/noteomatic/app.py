@@ -392,9 +392,10 @@ def show_tag(tag):
 
 
 @app.route("/tags")
+@login_required
 def show_all_tags():
     """Show all available tags"""
-    notes = get_all_notes()
+    notes = get_all_notes(current_user.id)
     all_tags = set()
     for note in notes:
         all_tags.update(tag.lower() for tag in note.tags)

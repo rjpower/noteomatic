@@ -35,7 +35,7 @@ class AppSettings(BaseSettings):
     google_client_id: str = Field(..., description="Google OAuth client ID")
     google_client_secret: str = Field(..., description="Google OAuth client secret")
     google_oauth_redirect_uri: str = Field(
-        default="http://localhost:5000/login/callback",
+        default="https://memento.labs.ephlabio.com:8000/login/callback",
         description="Google OAuth redirect URI"
     )
     

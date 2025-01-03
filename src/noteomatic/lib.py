@@ -317,11 +317,11 @@ def submit_files(
                 # Convert image to PDF
                 pdf_path = dest_path.with_suffix('.pdf')
                 convert_image_to_pdf(file_path, pdf_path)
-                sources.append(pdf_path)
+                pdf_sources.append(pdf_path)
             elif file_path.suffix.lower() == '.pdf':
                 if file_path != dest_path:
                     shutil.copy2(file_path, dest_path)
-                sources.append(dest_path)
+                pdf_sources.append(dest_path)
 
     if pdf_sources:
         process_pdf_files(pdf_sources, raw_dir, build_dir)

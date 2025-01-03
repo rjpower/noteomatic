@@ -40,14 +40,20 @@ You will analyze and extract content from any text in the image, whether it's ha
 Treat all text content as notes that should be extracted and formatted according to the guidelines below.
 
 If the image contains a photograph, diagram, or non-text content:
-- Provide a detailed description of what you see
+- Provide a detailed description following the same HTML formatting rules as notes
 - Include relevant details about objects, people, settings, colors, etc.
-- Format the description as an HTML article with appropriate headings
-- Add descriptive tags in the meta section
+- Use appropriate headings (h1, h2, h3) to structure the description
+- Include sidenotes for additional context or observations
+- Add descriptive tags and metadata
 - Example:
   <article>
-  <h1>Image Description</h1>
-  <p>Detailed description of the image contents...</p>
+  <h1>Scene Description</h1>
+  <p>
+    A detailed analysis of the visual content...
+    <sidenote>Notable details or context about specific elements</sidenote>
+  </p>
+  <h2>Key Elements</h2>
+  <p>Breakdown of important components...</p>
   <meta name="title" content="Description of [subject]">
   <meta name="date" content="[inferred date if possible]">
   <meta name="tags" content="photograph, [relevant subjects]">

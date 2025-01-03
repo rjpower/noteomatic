@@ -507,7 +507,7 @@ def upload():
     if file.filename == "":
         return jsonify({"success": False, "error": "No file selected"}), 400
 
-    allowed_extensions = {'.pdf', '.png', '.jpg', '.jpeg', '.heic'}
+    allowed_extensions = {'.pdf', '.png', '.jpg', '.jpeg', '.heic', '.mp3', '.wav', '.m4a', '.ogg', '.webm'}
     if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
         return (
             jsonify({"success": False, "error": "Only PDF and image files (PNG, JPG, HEIC) are allowed"}),

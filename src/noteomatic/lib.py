@@ -88,12 +88,12 @@ def process_pdf_files(
     # process tags and wiki links
     try:
         with multiprocessing.dummy.Pool(1) as pool:
-        tagged_notes = pool.map(
-            lambda note: process_article_tags(note, cache_dir=cache_dir), all_notes
-        )
+            tagged_notes = pool.map(
+                lambda note: process_article_tags(note, cache_dir=cache_dir), all_notes
+            )
 
-    # extract article again, since tags may have been added
-    for i, note in enumerate(tagged_notes):
+        # extract article again, since tags may have been added
+        for i, note in enumerate(tagged_notes):
         if "<article>" in note and "</article>" in note:
             note = note.split("<article>")[1].split("</article>")[0]
             tagged_notes[i] = f"<article>{note}</article>"

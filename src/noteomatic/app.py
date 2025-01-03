@@ -177,9 +177,31 @@ def browse():
     notes = get_all_notes()
     return render_template("index.html", notes=notes, show_search=True)
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def index():
     """Show upload and AI chat interface"""
+    if request.method == "POST":
+        message = request.json.get("message")
+        if not message:
+            return jsonify({"error": "No message provided"}), 400
+            
+        # Get all notes for AI search
+        with get_repo() as repo:
+            notes = repo.get_all()
+            
+        # Prepare notes with their IDs and content
+        note_data = [(note.id, note.raw_content) for note in notes]
+        
+        # Get AI response
+        cache_dir = settings.build_dir / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        ai_response = ai_search(message, note_data, cache_dir)
+        
+        return jsonify({
+            "success": True,
+            "response": ai_response
+        })
+        
     return render_template("upload.html")
 
 

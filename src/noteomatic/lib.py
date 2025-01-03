@@ -3,6 +3,8 @@ import logging
 import multiprocessing.dummy
 import pickle
 import shutil
+import img2pdf
+from PIL import Image
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -145,29 +147,67 @@ def sync_from_drive(
     return new_files
 
 
+def convert_image_to_pdf(image_path: Path, output_path: Path) -> Path:
+    """Convert an image file to PDF format."""
+    temp_path = None
+    try:
+        with Image.open(image_path) as img:
+            # Convert HEIC or handle color modes
+            if image_path.suffix.lower() == '.heic' or img.mode not in ['RGB', 'L']:
+                # Convert to RGB mode and save as PNG
+                img = img.convert('RGB')
+                temp_path = image_path.with_suffix('.png')
+                img.save(temp_path, 'PNG')
+                image_path = temp_path
+
+        # Convert to PDF
+        with open(output_path, "wb") as pdf_file:
+            pdf_file.write(img2pdf.convert(str(image_path)))
+        
+        return output_path
+    finally:
+        # Clean up temporary file if created
+        if temp_path and temp_path.exists():
+            temp_path.unlink()
+
 def submit_files(
     source: Path,
     raw_dir: Path,
     build_dir: Path
 ) -> List[Path]:
-    """Submit a new PDF or directory of PDFs for processing."""
+    """Submit new files (PDF or images) for processing."""
     raw_dir.mkdir(exist_ok=True)
     build_dir.mkdir(exist_ok=True)
 
     source = source.expanduser()
 
-    # Copy source to raw directory
+    # Process source files
     sources = []
     if source.is_file():
-        if source != raw_dir / source.name:
-            shutil.copy2(source, raw_dir / source.name)
-        sources.append(raw_dir / source.name)
+        dest_path = raw_dir / source.name
+        if source.suffix.lower() in ['.png', '.jpg', '.jpeg', '.heic']:
+            # Convert image to PDF
+            pdf_path = dest_path.with_suffix('.pdf')
+            convert_image_to_pdf(source, pdf_path)
+            sources.append(pdf_path)
+        elif source.suffix.lower() == '.pdf':
+            if source != dest_path:
+                shutil.copy2(source, dest_path)
+            sources.append(dest_path)
     else:
         for filename in glob.glob(str(source)):
-            pdf = Path(filename)
-            if pdf != raw_dir / pdf.name:
-                shutil.copy2(pdf, raw_dir / pdf.name)
-            sources.append(raw_dir / pdf.name)
+            file_path = Path(filename)
+            dest_path = raw_dir / file_path.name
+            
+            if file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.heic']:
+                # Convert image to PDF
+                pdf_path = dest_path.with_suffix('.pdf')
+                convert_image_to_pdf(file_path, pdf_path)
+                sources.append(pdf_path)
+            elif file_path.suffix.lower() == '.pdf':
+                if file_path != dest_path:
+                    shutil.copy2(file_path, dest_path)
+                sources.append(dest_path)
 
     if sources:
         process_pdf_files(sources, raw_dir, build_dir)

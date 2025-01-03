@@ -42,8 +42,8 @@
 <body>
     <h1>Upload PDF</h1>
     <div class="drop-zone">
-        <span class="drop-zone__prompt">Drop PDF file here or click to upload</span>
-        <input type="file" name="pdf" class="drop-zone__input" accept=".pdf">
+        <span class="drop-zone__prompt">Drop PDF or image file here or click to upload</span>
+        <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic">
     </div>
     <div id="status"></div>
 
@@ -78,7 +78,8 @@
 
                 if (e.dataTransfer.files.length) {
                     const file = e.dataTransfer.files[0];
-                    if (file.type === "application/pdf") {
+                    const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/heic"];
+                    if (allowedTypes.includes(file.type)) {
                         uploadFile(file);
                     } else {
                         document.getElementById("status").textContent = "Please upload a PDF file";

@@ -33,24 +33,22 @@ notes and converting them to semantic HTML using the Tufte CSS framework.
 
 ## Content Analysis:
 
-First, analyze whether the image contains handwritten notes or other content:
+You will analyze and extract content from any text in the image, whether it's handwritten, printed, or typed.
+Treat all text content as notes that should be extracted and formatted according to the guidelines below.
 
-1. If the image contains handwritten notes:
-   - Proceed with note extraction as detailed below
-   
-2. If the image contains a photograph, diagram, or other non-handwritten content:
-   - Provide a detailed description of what you see
-   - Include relevant details about objects, people, settings, colors, etc.
-   - Format the description as an HTML article with appropriate headings
-   - Add descriptive tags in the meta section
-   - Example:
-     <article>
-     <h1>Image Description</h1>
-     <p>Detailed description of the image contents...</p>
-     <meta name="title" content="Description of [subject]">
-     <meta name="date" content="[inferred date if possible]">
-     <meta name="tags" content="photograph, [relevant subjects]">
-     </article>
+If the image contains a photograph, diagram, or non-text content:
+- Provide a detailed description of what you see
+- Include relevant details about objects, people, settings, colors, etc.
+- Format the description as an HTML article with appropriate headings
+- Add descriptive tags in the meta section
+- Example:
+  <article>
+  <h1>Image Description</h1>
+  <p>Detailed description of the image contents...</p>
+  <meta name="title" content="Description of [subject]">
+  <meta name="date" content="[inferred date if possible]">
+  <meta name="tags" content="photograph, [relevant subjects]">
+  </article>
 
 ## Extracting notes:
 

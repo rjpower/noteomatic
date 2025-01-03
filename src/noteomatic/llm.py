@@ -305,17 +305,25 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
 
     messages = _make_initial_request(img_batch)
 
-    # First pass - get initial notes
-    first_pass = (
-        completion(
+    try:
+        # First pass - get initial notes
+        response = completion(
             model=EXTRACTION_MODEL,
             messages=messages,
             num_retries=2,
             api_key=settings.gemini_api_key,
         )
-        .choices[0]
-        .message.content
-    )
+        first_pass = response.choices[0].message.content
+        
+        # Validate HTML structure
+        if "<article>" not in first_pass or "</article>" not in first_pass:
+            logging.error(f"Invalid HTML structure in LLM response for batch {cache_key}")
+            logging.error(f"Response content: {first_pass[:500]}...")
+            raise ValueError("LLM response missing article tags")
+            
+    except Exception as e:
+        logging.error(f"Error in first pass LLM processing for batch {cache_key}: {str(e)}")
+        raise
 
     # Second pass - cleanup with original results
     cleanup_messages = [
@@ -324,19 +332,38 @@ def query_llm_with_cleanup(cache_dir: Path, img_batch: List[ImageData]):
         {"role": "user", "content": CLEANUP_PROMPT},
     ]
 
-    cleaned = (
-        completion(
+    try:
+        response = completion(
             model=EXTRACTION_MODEL,
             messages=cleanup_messages,
             num_retries=2,
             api_key=settings.gemini_api_key,
         )
-        .choices[0]
-        .message.content
-    )
+        cleaned = response.choices[0].message.content
 
+        # Validate HTML and command structure
+        if "<article>" not in cleaned or "</article>" not in cleaned:
+            logging.error(f"Invalid HTML structure in cleanup response for batch {cache_key}")
+            logging.error(f"Response content: {cleaned[:500]}...")
+            raise ValueError("Cleanup response missing article tags")
 
-    return cleaned
+        # Check for valid command JSON
+        if "<command>" in cleaned:
+            import json
+            for cmd_start in cleaned.split("<command>")[1:]:
+                cmd_content = cmd_start.split("</command>")[0]
+                try:
+                    json.loads(cmd_content)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Invalid command JSON in batch {cache_key}: {cmd_content}")
+                    logging.error(f"JSON error: {str(e)}")
+                    raise ValueError(f"Invalid command JSON: {str(e)}")
+
+        return cleaned
+
+    except Exception as e:
+        logging.error(f"Error in cleanup pass for batch {cache_key}: {str(e)}")
+        raise
 
 
 def ai_search(query: str, notes: List[tuple[int, str]], cache_dir: Path) -> str:

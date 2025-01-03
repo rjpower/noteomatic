@@ -67,13 +67,20 @@ def process_pdf_files(
     cache_dir.mkdir(parents=True, exist_ok=True)
     note_dir.mkdir(parents=True, exist_ok=True)
 
-    results = extract_notes(all_images, cache_dir=cache_dir)
+    try:
+        results = extract_notes(all_images, cache_dir=cache_dir)
 
-    # Split and save notes
-    all_notes = []
-    for result in results:
-        logger.info("Processing result of length %d", len(result))
-        all_notes.extend(split_notes(result))
+        # Split and save notes
+        all_notes = []
+        for i, result in enumerate(results):
+            logger.info("Processing result %d of length %d", i, len(result))
+            try:
+                split_result = split_notes(result)
+                all_notes.extend(split_result)
+            except Exception as e:
+                logger.error(f"Error splitting notes in batch {i}: {str(e)}")
+                logger.error(f"Problem content: {result[:500]}...")
+                raise
 
     # process tags and wiki links
     with multiprocessing.dummy.Pool(1) as pool:

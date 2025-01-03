@@ -1,10 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload PDF</title>
-    <style>
+{% extends "base.html" %}
+
+{% block title %}Upload Notes{% endblock %}
+
+{% block head %}
+<style>
         .drop-zone {
             width: 100%;
             max-width: 600px;
@@ -140,9 +139,11 @@
             color: #666;
         }
     </style>
-</head>
-<body>
-    <h1>NoteOmatic</h1>
+{% endblock %}
+
+{% block content %}
+<article>
+    <h1>Upload Notes</h1>
     
     <div class="container">
         <div class="section">
@@ -171,8 +172,9 @@
         <button onclick="captureImage('library')" class="mobile-btn">Choose from Library</button>
     </div>
     <div id="status"></div>
+</article>
 
-    <script>
+<script>
         document.querySelectorAll(".drop-zone").forEach(dropZone => {
             const input = dropZone.querySelector(".drop-zone__input");
 
@@ -261,5 +263,4 @@
             });
         }
     </script>
-</body>
-</html>
+{% endblock %}

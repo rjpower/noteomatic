@@ -29,7 +29,14 @@ class AppSettings(BaseSettings):
         description="SCP target for sharing notes",
     )
     gemini_api_key: str = ""
-
+    
+    # Google OAuth settings
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_oauth_redirect_uri: str = "http://localhost:5000/login/callback"
+    
+    # User data settings
+    users_dir: Path = root_dir / "users"
     public_share_url: str = ""
     build_dir: Path = root_dir / "build"
     raw_dir: Path = root_dir / "raw"

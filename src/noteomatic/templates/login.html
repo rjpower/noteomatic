@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <h1>Welcome to Noteomatic</h1>
+    <p>Please sign in to continue:</p>
+    
+    <div class="login-buttons">
+        <a href="{{ url_for('login') }}" class="login-button google-login">
+            <img src="/static/icons/google.svg" alt="Google logo" class="login-icon">
+            Sign in with Google
+        </a>
+    </div>
+</div>
+
+<style>
+.login-container {
+    max-width: 400px;
+    margin: 4rem auto;
+    text-align: center;
+}
+
+.login-buttons {
+    margin-top: 2rem;
+}
+
+.login-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.login-button:hover {
+    background-color: #f5f5f5;
+}
+
+.login-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.google-login {
+    background-color: white;
+    border-color: #4285f4;
+    color: #4285f4;
+}
+
+.google-login:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

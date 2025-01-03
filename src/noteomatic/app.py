@@ -318,7 +318,6 @@ def index():
 def show_note(note_id):
     """Display a specific note"""
     try:
-    """Display a specific note"""
         note = get_note_by_id(note_id, current_user.id)
     except KeyError:
         abort(404, "Note not found")

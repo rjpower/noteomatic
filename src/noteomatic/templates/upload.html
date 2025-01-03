@@ -30,8 +30,8 @@
                     Library
                 </button>
                 <button onclick="toggleAudioRecording()" class="btn" id="recordButton">
-                    <img src="/static/icons/mic.svg" alt="Microphone" class="btn-icon">
-                    Record Audio
+                    <img src="/static/icons/mic.svg" alt="Microphone" class="btn-icon" id="recordIcon">
+                    <span id="recordText">Record Audio</span>
                 </button>
             </div>
             <div id="audioRecorder" style="display: none;">
@@ -39,7 +39,9 @@
                     <span id="recordingTime">00:00</span>
                     <div class="recording-indicator"></div>
                 </div>
-                <audio id="audioPlayback" controls style="display: none;"></audio>
+            </div>
+            <div id="audioPlaybackContainer" style="display: none;">
+                <audio id="audioPlayback" controls></audio>
             </div>
 
             <div class="drop-zone">
@@ -146,7 +148,7 @@
                     const audioUrl = URL.createObjectURL(audioBlob);
                     const audio = document.getElementById('audioPlayback');
                     audio.src = audioUrl;
-                    audio.style.display = 'block';
+                    document.getElementById('audioPlaybackContainer').style.display = 'block';
                     
                     // Convert to MP3 and upload
                     uploadFile(new File([audioBlob], 'recording.webm', { type: 'audio/webm' }));
@@ -157,10 +159,12 @@
                 updateRecordingTime();
                 
                 document.getElementById('audioRecorder').style.display = 'block';
-                document.getElementById('recordButton').innerHTML = `
-                    <img src="/static/icons/stop.svg" alt="Stop" class="btn-icon">
-                    Stop Recording
-                `;
+                const recordIcon = document.getElementById('recordIcon');
+                const recordText = document.getElementById('recordText');
+                recordIcon.src = '/static/icons/stop.svg';
+                recordIcon.alt = 'Stop';
+                recordText.textContent = 'Stop Recording';
+                recordIcon.style.filter = 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)'; // Makes icon red
                 
             } catch (err) {
                 console.error('Error accessing microphone:', err);
@@ -174,10 +178,13 @@
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 clearInterval(recordingTimer);
                 
-                document.getElementById('recordButton').innerHTML = `
-                    <img src="/static/icons/mic.svg" alt="Microphone" class="btn-icon">
-                    Record Audio
-                `;
+                const recordIcon = document.getElementById('recordIcon');
+                const recordText = document.getElementById('recordText');
+                recordIcon.src = '/static/icons/mic.svg';
+                recordIcon.alt = 'Microphone';
+                recordText.textContent = 'Record Audio';
+                recordIcon.style.filter = 'none';
+                document.getElementById('audioPlaybackContainer').style.display = 'none';
             }
         }
         

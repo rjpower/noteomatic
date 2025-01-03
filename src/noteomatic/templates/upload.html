@@ -32,6 +32,40 @@
             display: none;
         }
 
+        .mobile-controls {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+            text-align: center;
+        }
+
+        .mobile-btn {
+            background-color: #009578;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 0 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .mobile-btn:active {
+            background-color: #007558;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+            
+            .drop-zone {
+                height: 150px;
+                font-size: 16px;
+            }
+        }
+
         #status {
             text-align: center;
             margin-top: 20px;
@@ -43,7 +77,13 @@
     <h1>Upload PDF</h1>
     <div class="drop-zone">
         <span class="drop-zone__prompt">Drop PDF or image file here or click to upload</span>
-        <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic">
+        <input type="file" name="pdf" class="drop-zone__input" accept=".pdf,.png,.jpg,.jpeg,.heic" capture>
+    </div>
+    
+    <!-- Mobile-specific controls -->
+    <div class="mobile-controls">
+        <button onclick="captureImage('camera')" class="mobile-btn">Take Photo</button>
+        <button onclick="captureImage('library')" class="mobile-btn">Choose from Library</button>
     </div>
     <div id="status"></div>
 
@@ -87,6 +127,30 @@
                 }
             });
         });
+
+        // Check if we're on a mobile device
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // Show/hide mobile controls based on device
+        window.addEventListener('load', function() {
+            if (isMobile()) {
+                document.querySelector('.mobile-controls').style.display = 'block';
+            }
+        });
+
+        // Handle camera/library capture
+        function captureImage(source) {
+            const input = document.querySelector(".drop-zone__input");
+            input.removeAttribute('capture');
+            
+            if (source === 'camera') {
+                input.setAttribute('capture', 'environment');
+            }
+            
+            input.click();
+        }
 
         function uploadFile(file) {
             const formData = new FormData();

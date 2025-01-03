@@ -81,9 +81,13 @@ def process_pdf_files(
                 logger.error(f"Error splitting notes in batch {i}: {str(e)}")
                 logger.error(f"Problem content: {result[:500]}...")
                 raise
+    except Exception as e:
+        logger.error("Error during note extraction and splitting")
+        raise
 
     # process tags and wiki links
-    with multiprocessing.dummy.Pool(1) as pool:
+    try:
+        with multiprocessing.dummy.Pool(1) as pool:
         tagged_notes = pool.map(
             lambda note: process_article_tags(note, cache_dir=cache_dir), all_notes
         )

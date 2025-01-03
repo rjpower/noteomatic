@@ -308,22 +308,33 @@ def submit_files(
             audio_dest.parent.mkdir(exist_ok=True)
             
             # Convert audio to standard format
+            logger.info("Converting audio to standard WAV format...")
             processed_audio = process_audio_file(source, audio_dest)
+            logger.info(f"Audio conversion complete: {processed_audio}")
             
             # Create an ImageData-like object for the audio file
+            logger.info("Creating ImageData object for audio...")
             from noteomatic.pdf import ImageData
             audio_data = ImageData(
                 mime_type="audio/wav",
                 content=processed_audio.read_bytes()
             )
+            logger.info(f"Created ImageData object, size: {len(audio_data.content)} bytes")
             
             # Process through Gemini
+            logger.info("Sending audio to Gemini for transcription...")
             results = extract_notes([audio_data], cache_dir=build_dir / "cache")
+            logger.info(f"Received {len(results)} results from Gemini")
+            
             if results:
                 # Save transcribed notes
                 notes_dir = build_dir / "notes"
                 notes_dir.mkdir(exist_ok=True)
+                logger.info(f"Saving transcribed notes to {notes_dir}")
                 save_notes(results, notes_dir)
+                logger.info("Notes saved successfully")
+            else:
+                logger.warning("No transcription results received from Gemini")
                 
             return [processed_audio]
     else:

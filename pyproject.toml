@@ -12,6 +12,7 @@ dependencies = [
     "ipykernel>=6.29.5",
     "pandas>=2.2.3",
     "flask>=3.1.0",
+    "flask-login>=0.6.3",
     "google-api-python-client>=2.156.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.2.1",
@@ -25,6 +26,8 @@ dependencies = [
     "sqlalchemy-utils>=0.41.2",
     "mypy>=1.14.0",
     "tenacity>=9.0.0",
+    "img2pdf>=0.5.1",
+    "reportlab>=4.1.0",
 ]
 
 [build-system]

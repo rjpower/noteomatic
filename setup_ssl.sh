@@ -20,11 +20,23 @@ sudo apt update
 sudo apt install -y nginx certbot python3-certbot-nginx netcat-traditional
 
 # Configure Nginx first without SSL
-echo "Configuring Nginx..."
-sudo cp nginx-ssl.conf /etc/nginx/sites-available/noteomatic
+echo "Configuring initial nginx setup..."
+sudo cp nginx-nossl.conf /etc/nginx/sites-available/noteomatic
 sudo ln -sf /etc/nginx/sites-available/noteomatic /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl restart nginx
 
-echo "Basic setup complete! Now run certbot manually:"
-echo "sudo certbot --nginx -d memento.labs.ephlabio.com"
+# Get SSL certificate
+echo "Obtaining SSL certificate..."
+sudo certbot --nginx -d memento.labs.ephlabio.com
+
+# Check if certificate was obtained successfully
+if [ -f "/etc/letsencrypt/live/memento.labs.ephlabio.com/fullchain.pem" ]; then
+    echo "SSL certificate obtained successfully. Configuring SSL..."
+    sudo cp nginx-ssl.conf /etc/nginx/sites-available/noteomatic
+    sudo nginx -t && sudo systemctl restart nginx
+    echo "SSL setup complete! Check https://memento.labs.ephlabio.com:8000"
+else
+    echo "Failed to obtain SSL certificate. Please check the certbot output above."
+    exit 1
+fi

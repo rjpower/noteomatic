@@ -136,22 +136,57 @@
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+                // Set specific options for Safari compatibility
+                const options = {
+                    mimeType: 'audio/webm;codecs=opus'
+                };
                 
+                try {
+                    mediaRecorder = new MediaRecorder(stream, options);
+                } catch (e) {
+                    // Fallback for Safari
+                    mediaRecorder = new MediaRecorder(stream);
+                }
+                
+                audioChunks = [];
                 mediaRecorder.ondataavailable = (event) => {
                     audioChunks.push(event.data);
                 };
                 
                 mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const audio = document.getElementById('audioPlayback');
-                    audio.src = audioUrl;
-                    document.getElementById('audioPlaybackContainer').style.display = 'block';
-                    
-                    // Convert to MP3 and upload
-                    uploadFile(new File([audioBlob], 'recording.webm', { type: 'audio/webm' }));
+                    try {
+                        // Determine the correct MIME type
+                        let mimeType = 'audio/webm';
+                        if (audioChunks[0] && audioChunks[0].type) {
+                            mimeType = audioChunks[0].type;
+                        }
+                        
+                        const audioBlob = new Blob(audioChunks, { type: mimeType });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        const audio = document.getElementById('audioPlayback');
+                        
+                        // Add error handling for playback
+                        audio.onerror = (e) => {
+                            console.error('Audio playback error:', e);
+                            document.getElementById('status').textContent = 
+                                'Audio recorded successfully but preview not available. Processing...';
+                        };
+                        
+                        audio.src = audioUrl;
+                        document.getElementById('audioPlaybackContainer').style.display = 'block';
+                        
+                        // Upload the file with the correct extension
+                        const extension = mimeType.includes('webm') ? 'webm' : 
+                                        mimeType.includes('mp4') ? 'm4a' : 
+                                        'wav';
+                        uploadFile(new File([audioBlob], `recording.${extension}`, { type: mimeType }));
+                    } catch (error) {
+                        console.error('Error handling recorded audio:', error);
+                        document.getElementById('status').textContent = 
+                            'Recording completed. Processing...';
+                        // Still try to upload even if playback fails
+                        uploadFile(new File([new Blob(audioChunks)], 'recording.wav'));
+                    }
                 };
                 
                 mediaRecorder.start();

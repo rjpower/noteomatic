@@ -1,22 +1,19 @@
-import shutil
-import subprocess
-from typing import List, Tuple
+from typing import List
 
-def check_ffmpeg() -> Tuple[bool, str]:
-    """Check if ffmpeg is available and get version"""
-    if not shutil.which('ffmpeg'):
-        return False, "ffmpeg not found in PATH"
-    
+def check_ffmpeg() -> List[str]:
+    """Check if ffmpeg is available through python-ffmpeg"""
+    errors = []
     try:
-        result = subprocess.run(['ffmpeg', '-version'], 
-                              capture_output=True, 
-                              text=True, 
-                              check=True)
-        return True, result.stdout.split('\n')[0]
-    except subprocess.CalledProcessError as e:
-        return False, f"Error running ffmpeg: {e}"
+        import ffmpeg
+        # Try to access ffmpeg.input which requires the binary
+        ffmpeg.input
+    except ImportError:
+        errors.append("python-ffmpeg package not installed")
+    except AttributeError:
+        errors.append("ffmpeg binary not found - please install ffmpeg")
     except Exception as e:
-        return False, f"Unexpected error checking ffmpeg: {e}"
+        errors.append(f"Unexpected error checking ffmpeg: {e}")
+    return errors
 
 def check_dependencies() -> List[str]:
     """Check all required dependencies
@@ -25,8 +22,6 @@ def check_dependencies() -> List[str]:
     errors = []
     
     # Check ffmpeg
-    ffmpeg_ok, ffmpeg_msg = check_ffmpeg()
-    if not ffmpeg_ok:
-        errors.append(f"FFmpeg dependency error: {ffmpeg_msg}")
+    errors.extend(check_ffmpeg())
         
     return errors

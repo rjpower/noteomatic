@@ -178,24 +178,67 @@ def process_audio_file(audio_path: Path, output_path: Path) -> Path:
     logger.info(f"Output path: {output_path}")
     logger.info(f"Input file format: {audio_path.suffix}")
     
+    if not audio_path.exists():
+        err_msg = f"Audio file not found: {audio_path}"
+        logger.error(err_msg)
+        raise FileNotFoundError(err_msg)
+        
+    # Create output directory if it doesn't exist
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
     # Convert to standardized WAV format for processing
     try:
         # Get input file information
-        probe = ffmpeg.probe(str(audio_path))
-        audio_info = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
-        if audio_info:
-            logger.info(f"Input audio format: {audio_info.get('codec_name', 'unknown')}")
-            logger.info(f"Input sample rate: {audio_info.get('sample_rate', 'unknown')} Hz")
-            logger.info(f"Input channels: {audio_info.get('channels', 'unknown')}")
-        
-        stream = ffmpeg.input(str(audio_path))
-        stream = ffmpeg.output(stream, str(output_path), acodec='pcm_s16le', ac=1, ar=16000)
-        logger.info("Starting FFmpeg conversion...")
-        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-        logger.info("FFmpeg conversion completed successfully")
-        return output_path
-    except ffmpeg.Error as e:
-        logger.error(f"FFmpeg error processing {audio_path}: {e.stderr.decode()}")
+        try:
+            probe = ffmpeg.probe(str(audio_path))
+            audio_info = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
+            if audio_info:
+                logger.info(f"Input audio format: {audio_info.get('codec_name', 'unknown')}")
+                logger.info(f"Input sample rate: {audio_info.get('sample_rate', 'unknown')} Hz")
+                logger.info(f"Input channels: {audio_info.get('channels', 'unknown')}")
+            else:
+                logger.warning(f"No audio stream found in file: {audio_path}")
+        except ffmpeg.Error as e:
+            logger.error(f"Error probing audio file {audio_path}: {e.stderr.decode() if hasattr(e, 'stderr') else str(e)}")
+            raise
+            
+        # Set up conversion
+        try:
+            stream = ffmpeg.input(str(audio_path))
+            stream = ffmpeg.output(stream, str(output_path), 
+                                 acodec='pcm_s16le', 
+                                 ac=1, 
+                                 ar=16000,
+                                 loglevel='warning')  # Capture more detailed FFmpeg logs
+            logger.info("Starting FFmpeg conversion...")
+            
+            # Run conversion with output capture
+            out, err = ffmpeg.run(stream, 
+                                overwrite_output=True, 
+                                capture_stdout=True, 
+                                capture_stderr=True)
+            
+            if err:
+                logger.info(f"FFmpeg conversion messages: {err.decode()}")
+                
+            if not output_path.exists() or output_path.stat().st_size == 0:
+                raise ffmpeg.Error(f"FFmpeg conversion failed to produce output file: {output_path}")
+                
+            logger.info("FFmpeg conversion completed successfully")
+            return output_path
+            
+        except ffmpeg.Error as e:
+            error_msg = e.stderr.decode() if hasattr(e, 'stderr') else str(e)
+            logger.error(f"FFmpeg conversion error for {audio_path}:")
+            logger.error(f"Command failed: {error_msg}")
+            logger.error(f"Full error: {str(e)}")
+            raise
+            
+    except Exception as e:
+        logger.error(f"Unexpected error processing audio file {audio_path}:")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e)}")
+        logger.error("Stack trace:", exc_info=True)
         raise
 
 def convert_image_to_pdf(image_path: Path, output_path: Path) -> Path:

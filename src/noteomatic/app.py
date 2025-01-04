@@ -19,6 +19,7 @@ from flask_login import LoginManager, current_user, login_required, login_user, 
 from flask import flash
 
 from noteomatic.auth import User
+import sys
 from flask import (
     Flask,
     Response,
@@ -30,6 +31,7 @@ from flask import (
     session,
     url_for,
 )
+from noteomatic.dependencies import check_dependencies
 from googleapiclient.http import MediaIoBaseDownload
 
 from noteomatic.config import settings
@@ -176,7 +178,17 @@ logging.basicConfig(
 
 
 def _init():
-    """Initialize database by loading notes from all user directories"""
+    """Initialize application and check dependencies"""
+    # Check dependencies first
+    errors = check_dependencies()
+    if errors:
+        print("\nFatal errors checking dependencies:", file=sys.stderr)
+        for error in errors:
+            print(f"  - {error}", file=sys.stderr)
+        print("\nPlease install missing dependencies and try again.", file=sys.stderr)
+        sys.exit(1)
+        
+    # Initialize database by loading notes from all user directories
     logging.info(f"Initializing database from {settings.users_dir}")
     
     # Ensure directories exist

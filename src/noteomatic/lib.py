@@ -3,6 +3,7 @@ import logging
 import multiprocessing.dummy
 import pickle
 import shutil
+import uuid
 from datetime import datetime
 import img2pdf
 from PIL import Image
@@ -330,10 +331,17 @@ def submit_files(
 
     source = source.expanduser()
 
+    def get_unique_path(path: Path) -> Path:
+        """Generate a unique filename with UUID"""
+        stem = path.stem
+        suffix = path.suffix
+        unique_name = f"{stem}_{uuid.uuid4().hex}{suffix}"
+        return path.parent / unique_name
+
     # Process source files
     pdf_sources = []
     if source.is_file():
-        dest_path = raw_dir / source.name
+        dest_path = get_unique_path(raw_dir / source.name)
         if source.suffix.lower() in ['.png', '.jpg', '.jpeg', '.heic']:
             # Convert image to PDF
             pdf_path = dest_path.with_suffix('.pdf')
@@ -383,7 +391,7 @@ def submit_files(
     else:
         for filename in glob.glob(str(source)):
             file_path = Path(filename)
-            dest_path = raw_dir / file_path.name
+            dest_path = get_unique_path(raw_dir / file_path.name)
             
             if file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.heic']:
                 # Convert image to PDF

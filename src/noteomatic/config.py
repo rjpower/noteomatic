@@ -1,15 +1,7 @@
 from pathlib import Path
-from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class DatabaseSettings(BaseModel):
-    """Database configuration settings"""
-
-    sqlite_wal: bool = True
-    sqlite_timeout: float = 30.0
 
 
 class AppSettings(BaseSettings):
@@ -20,8 +12,6 @@ class AppSettings(BaseSettings):
         env_file_encoding="utf-8",
         env_nested_delimiter="_",
     )
-
-    db: DatabaseSettings = DatabaseSettings()
 
     root_dir: Path = Path(__file__).parent.parent.parent
     scp_target: str = Field(
@@ -36,13 +26,5 @@ class AppSettings(BaseSettings):
     notes_dir: Path = build_dir / "notes"
     debug: bool = Field(default=False, description="Enable debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
-
-    @property
-    def static_dir(self) -> Path:
-        return self.root_dir / "static"
-
-    @property
-    def template_dir(self) -> Path:
-        return Path(__file__).parent / "templates"
 
 settings = AppSettings()

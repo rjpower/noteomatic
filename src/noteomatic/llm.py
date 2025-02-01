@@ -359,7 +359,7 @@ def extract_notes(
     image_batches = [
         images[i : i + batch_size] for i in range(0, len(images), batch_size)
     ]
-    with multiprocessing.dummy.Pool(4) as pool:
+    with multiprocessing.dummy.Pool(1) as pool:
         return pool.map(
             lambda img_batch: query_llm_with_cleanup(cache_dir, img_batch),
             image_batches,

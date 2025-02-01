@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Generator, List, Optional
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -27,15 +27,13 @@ class SqliteConnection:
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=True)
         self.engine = create_engine(url=f"sqlite:///{self.tmp.name}")
 
-        if config.settings.db.sqlite_wal:
-            # Enable WAL mode
-            @event.listens_for(self.engine, "connect")
-            def set_sqlite_pragma(dbapi_connection, connection_record):
-                if isinstance(dbapi_connection, sqlite3.Connection):
-                    cursor = dbapi_connection.cursor()
-                    cursor.execute("PRAGMA journal_mode=WAL")
-                    cursor.execute("PRAGMA busy_timeout=10000")  # 10s timeout
-                    cursor.close()
+        @event.listens_for(self.engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            if isinstance(dbapi_connection, sqlite3.Connection):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA busy_timeout=10000")  # 10s timeout
+                cursor.close()
 
 
 connection = SqliteConnection()

@@ -22,11 +22,10 @@ from flask import (
     request,
     url_for,
 )
-from googleapiclient.http import MediaIoBaseDownload
 
 from noteomatic.config import settings
-from noteomatic.database import NoteModel, get_repo
-from noteomatic.lib import get_google_drive_service, submit_files
+from noteomatic.demo.database import NoteModel, get_repo
+from noteomatic.lib import extract_from_files
 
 # Cache for database connection
 _db_connection = None
@@ -45,6 +44,7 @@ def get_note_by_id(note_id: int) -> NoteModel:
             raise KeyError(f"Note with ID {note_id} not found")
         return note
 
+
 def get_all_notes() -> List[NoteModel]:
     """Get all notes from the database"""
     with get_repo() as repo:
@@ -53,13 +53,14 @@ def get_all_notes() -> List[NoteModel]:
             # Parse content and get first two paragraphs
             soup = BeautifulSoup(note.raw_content, "html.parser")
             preview_paras = []
-            for p in soup.find_all(['p', 'div']):
+            for p in soup.find_all(["p", "div"]):
                 if p.get_text().strip():  # Only include non-empty paragraphs
                     preview_paras.append(p.get_text().strip())
                     if len(preview_paras) == 2:
                         break
-            note.preview_text = '\n'.join(preview_paras) if preview_paras else ''
+            note.preview_text = "\n".join(preview_paras) if preview_paras else ""
         return notes
+
 
 def count_notes() -> int:
     """Count the number of notes in the database"""
@@ -90,13 +91,15 @@ def load_notes_from_dir(dir: Path) -> List[NoteModel]:
                 notes.append(note)
     return notes
 
+
 NOTES_DIR = settings.notes_dir
+DEMO_DIR = Path(__file__).parent
 
 app = Flask(
     __name__,
     static_url_path="/static",
-    static_folder=str(settings.static_dir),
-    template_folder=str(settings.template_dir),
+    static_folder=str(DEMO_DIR / "static"),
+    template_folder=str(DEMO_DIR / "templates"),
 )
 
 logging.basicConfig(
@@ -112,6 +115,7 @@ def _init():
 
 
 _init()
+
 
 @app.route("/search")
 def search():
@@ -352,7 +356,7 @@ def upload():
 
     try:
         # Process the uploaded PDF
-        submit_files(file_path, upload_dir, Path(settings.build_dir))
+        extract_from_files(file_path, upload_dir, Path(settings.build_dir))
         # reload the database
         _init()
         return jsonify({"success": True})
@@ -365,54 +369,17 @@ def upload():
         )
 
 
-@app.route("/sync", methods=["POST"])
-def sync():
-    """Handle syncing of selected files from Google Picker."""
-    data = request.json
-    file_id = data.get("fileId")
-    if not file_id:
-        return jsonify({"error": "No file ID provided"}), 400
-
-    # Get Google Drive service
-    service = get_google_drive_service()
-
-    # Get file metadata
-    file = service.files().get(fileId=file_id, fields="name, mimeType").execute()
-    file_name = file["name"]
-    mime_type = file["mimeType"]
-
-    if mime_type != "application/pdf":
-        return jsonify({"error": "Only PDF files are supported"}), 400
-
-    # Download the file
-    local_path = Path(app.config["RAW_DIR"]) / file_name
-    download_request = service.files().get_media(fileId=file_id)
-    with open(local_path, "wb") as f:
-        downloader = MediaIoBaseDownload(f, download_request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-            if status:
-                print(f"Downloading {file_name}: {int(status.progress() * 100)}%")
-
-    # Process the file
-    submit_files(local_path, Path(app.config["RAW_DIR"]), Path(app.config["BUILD_DIR"]))
-    return jsonify({"success": True, "message": f"Processed {file_name}"})
-
-
 @app.route("/note/<int:note_id>/edit", methods=["GET"])
 def edit_note(note_id):
     """Show edit form for a note"""
     note = get_note_by_id(note_id)
     if not note:
         abort(404, "Note not found")
-    
+
     return render_template(
-        "edit.html",
-        note_id=note_id,
-        content=note.raw_content,
-        title=note.title
+        "edit.html", note_id=note_id, content=note.raw_content, title=note.title
     )
+
 
 @app.route("/note/<int:note_id>/save", methods=["POST"])
 def save_note(note_id):
@@ -435,6 +402,7 @@ def save_note(note_id):
     _init()
 
     return redirect(url_for("show_note", note_id=note_id))
+
 
 if __name__ == "__main__":
     app.run(debug=settings.debug)

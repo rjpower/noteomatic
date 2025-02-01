@@ -22,6 +22,8 @@ dependencies = [
     "sqlalchemy-utils>=0.41.2",
     "mypy>=1.14.0",
     "tenacity>=9.0.0",
+    "pyyaml>=6.0.2",
+    "markdown-it-py[plugins]>=3.0.0",
 ]
 
 [build-system]

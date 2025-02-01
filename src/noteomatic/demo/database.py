@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from noteomatic import config
+from noteomatic.notes import parse_note
 
 
 class SqliteConnection:
@@ -77,41 +78,18 @@ class NoteModel(Base):
     def from_file(cls, file_path: Path, notes_dir: Path) -> tuple[str, "NoteModel"]:
         """Create a note instance from a file"""
         content = file_path.read_text()
-        soup = BeautifulSoup(content, "html.parser")
-
-        # Parse metadata and look for title and tags.
-        title_meta = soup.find("meta", {"name": "title"})
-        title = title_meta["content"] if title_meta else ""
-
-        # if no meta title, look for h1
-        if not title:
-            title = soup.find("h1").text if soup.find("h1") else ""
-        if not title:
-            title = soup.find("h2").text if soup.find("h2") else ""
-        if not title:
-            title = soup.find("h3").text if soup.find("h3") else ""
-
-        if not title:
-            title = file_path.stem
-
-        # Parse date for created_at
-        date_meta = soup.find("meta", {"name": "date"})
-        created_at = None
-        if date_meta and date_meta["content"]:
-            for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
-                try:
-                    created_at = datetime.strptime(date_meta["content"], fmt)
-                    break
-                except ValueError:
-                    continue
-
-        if not created_at:
+        front_matter, content = parse_note(content)
+        created_at = front_matter.get("date")
+        if created_at:
+            # parse from YYYY-MM-DD
+            created_at = datetime.strptime(created_at, "%Y-%m-%d")
+        else:
             created_at = datetime.fromtimestamp(file_path.stat().st_ctime)
 
-        tags_meta = soup.find("meta", {"name": "tags"})
-        tags = []
-        if tags_meta and tags_meta["content"]:
-            tags = [tag.strip().lower() for tag in tags_meta["content"].split(",")]
+        title = front_matter["title"]
+
+        tags = front_matter.get("tags", [])
+        tags = [tag.strip().lower() for tag in tags]
 
         # Create note instance
         note = cls(

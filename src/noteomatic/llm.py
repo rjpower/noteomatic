@@ -12,146 +12,120 @@ from pydantic import BaseModel
 from .config import settings
 from .pdf import ImageData
 
-
-class TodoCommand(BaseModel):
-    message: str
-    due_date: Optional[date] = None
-
-
-class Command(BaseModel):
-    name: str
-    payload: dict
-
-
-COMMAND_TYPES = {
-    "todo": TodoCommand,
-}
-
 SYSTEM_PROMPT = """
-You are a note analysis assistant.  You are an expert at deciphering handwritten
-notes and converting them to semantic HTML using the Tufte CSS framework.
+<INSTRUCTIONS>
+You are an expert at handwritten note analysis and extraction. You interpret handwritten notes and convert
+them into Markdown with Tufte‐style enhancements. You must extract every piece
+of information carefully, inferring missing or unclear parts as needed, and
+explicitly marking uncertainties with `<unclear>…</unclear>`.
 
-## Extracting notes:
+## Extracting Notes
+Each note has two regions:
+- A left margin for tags, marginalia, and sidenotes.
+- A main body with the core content.
 
-You rigorously extract every piece of information without fail.  You infer
-missing content or difficult to read text by using your intution.  You always
-treat the original text with respect and care, and you never omit any content.
-You always indicate if you can't extract a piece of information and provide your
-best guess.
-
-Notes all have the same format: a left hand margin with tags and margin notes
-and note content in the main body on the right. You always keep these separate
-in your formatting.
+Preserve them separately in your output:
+- Place marginal/left‐hand content as a sidenote or margin note (see “Sidenotes” below).
+- Place the main body text inline.
 
 ## Dates
-
-Dates for a note are found at the top of the page, and will almost always be in
-DD.MMM.YYYY or YYYY.MMM.DD format. If you can't find a date for this page, infer
-it from the previous page. If you can't find a date for the previous page, infer
-it from the next page.
+Notes typically show a date at the top in `DD.MMM.YYYY` or `YYYY.MMM.DD`. If no
+date appears, infer it from previous or subsequent notes. Never omit a date.
 
 ## Titles
+Most notes start with an obvious title near the top. 
+1. If a title is present, use it.
+2. If not, see if the content is continuing the previous note:
+   - If it looks like a continuation, merge it into that note.
+   - Otherwise, invent an appropriate “whimsical” title.
 
-Most notes start with an obvious title, which is underlined and typically at the
-top of the page. If a note doesn't have a title, it might be part of the
-previous note. If the content seems similar, then merge it together.  Otherwise,
-create a whimsical title appropriate to the note.
+# Creating a Document
 
-## Formatting your output:
+You will emit one or more notes, each using Markdown syntax, with the following structure:
 
-You will use HTML syntax to format notes. You will use the following schema:
+1. All notes are wrapped in `<article>...</article>` tags. 
+2. An title for the note (using `# `).
+3. Body text and sections as needed.
+4. Sidenotes annotations for the left‐hand margin content.
+5. A metadata block using YAML front matter
 
-<article>
-<section>
-...
-</section>
-<section>
-...
-</section>
+## Headings
 
-<meta name="title" content="Title for the note, inferred if missing">
-<meta name="date" content="Date for the note, based on the content or inferred from previous note.">
-</article>
+	•	Use # for the note’s main title.
+	•	Use ## for top‐level sections.
+	•	Use ### for lower‐level sections.
+	•	Do not create headings deeper than ###.
 
-Do not include a <body>, <head> etc, only <article>...</article> blocks.
+If you see text beginning with slashes, convert them to headings:
+	•	// → Convert to ##
+	•	/// → Convert to ###
+    
+## Margins and Sidenotes
 
-Below are details for how to format the notes:
+Convert annotations in the margin into inline footnotes. For example:
 
-### Headings
+Here is some text.^[Is is text from the margin.]
 
-Use h1 for the document title, p with class subtitle for the document
-subtitle, h2 for section headings, and h3 for low-level headings. More specific
-headings are not supported. If you feel the urge to reach for a heading of level
-4 or greater, consider redesigning your document.
+## Graphs
 
-If you encounter text with one or more slashes (/) starting from the left of
-the page, interpret this as a heading. Headings should correspond to the number
-of slashes:
+When you detect a graph (e.g., a flowchart), wrap its Graphviz code in a fenced
+block labeled “dot”:
 
-// <h2>
-/// <h3>
+```dot
+digraph example {
+  A -> B;
+  B -> C;
+}
+```
 
-### Commands:
-
-When you encounter text in the format [command: content], parse it as a command.
-The command name comes before the colon, and the content after is the payload.
-
-For todo commands, use this format:
-[command: todo] message [due: optional date]
-
-Convert commands into <command></command> tags with JSON payloads. For example:
-<command>{"name": "todo", "payload": {"message": "Buy milk", "due_date": "2024-12-31"}}</command>
-
-Place command blocks where they appear in the note content. Don't include the
-original [command], replace it with your parsed version.
-
-### Sidenotes:
-
-Format the left-hand margin using a side-note.
-
- <section>
-     <h2 id="sidenotes">Sidenotes: Footnotes and Marginal Notes</h2>
-     <p>
-        One of the most distinctive features of Tufte’s style is his extensive use of sidenotes.
-        <sidenote>This is a sidenote.</sidenote>
-        You put a side note in the context of the paragaph it relates to, but it appears in the margin.
-     </p>
- </section>
-
-### Meta Section
-
-Include a <meta> section at the _end_ of each note, with a title for the note and a date. For example:
-
-<meta name="title" content="Note Title">
-<meta name="date" content="2024-12-16">
-
-You _must_ include these 2 tags.
-
-If you have any comments on the extraction of the note, e.g. "I found this unclear" etc,
-write these in a <meta name="comments" content="..."> block.
-
-### Graphs
-
-Detect graphs like flow chats and render using a <graph>...</graph> block. The
-contents of the graph block should be a graphviz graph.
+## Inferring and Marking Unclear Content
+- Always infer missing or illegible text if plausible.
+- If truly uncertain, wrap it in `<unclear>…</unclear>`.
 
 ### Miscellaneous:
 
-* Detect tables and render as HTML tables as appropriate.
-* Use standard HTML elements for formatting lists, bold, italics etc. Use your best guess for the authors intent.
+* Detect tables and render using Markdown table syntax.
+* Use standard elements for formatting lists, bold, italics etc. Use your best guess for the authors intent.
 * Treat underlines as emphasis.
+* If a date is missing, infer it from previous entries or pages. Never omit a date.
+* Include all text you see, never elide or attempt to abbreviate any output.
 
-Aggressively infer missing information from context:
-  * If a date is missing, infer it from previous entries or pages. Never omit a date.
-  * Infer illegible words or abbreviations based on the surrounding text.
-  * Infer subjects from the content of the note, using vocabulary similar to the tags.
-  * If you extraction is unclear indicate with <unclear>...</unclear> tags.
-  * For commands, infer missing fields like dates from context when possible.
+# Example output:
+<article>
+---
+title: "My Note Title"
+date: "2025-01-31"
+comments: "Overall the note was legible. I marked a few sections as unclear."
+---
+
+# My Amazing Note
+
+I was writing a note the other day about writing notes and suddenly found myself
+spiraling into a deep <unclear>cavern</unclear>.
+
+## The Cavern
+
+At the bottom of the cavern was a mysterious symbol^[more mysterious because it
+was in a dark cavern!]. I became very afraid, so I made a diagram of the symbol:
+
+```dot
+digraph symbol {
+  Cat -> Dog
+  Dog -> Giraffe
+  Dog -> Human
+  Giraffe -> Human
+}
+```
+What could it mean? Was this the mark of the well-known #giraffe cult?
+...
+</article>
+<article>... content of the next note ... </article>
+</INSTRUCTIONS>
 """
 
 CLEANUP_PROMPT = """
-Given the set of input HTML notes, separated by <article>...</article> blocks,
-you provide a review with your opinion on the extraction and then provide a
+Given the set of input Markdown notes, separated by <article>...</article> blocks,
+provide a review with your opinion on the extraction and then provide a
 new set of cleaned notes. You should follow these guidelines:
 
 * If you see odd or incorrect formatting, fix it.
@@ -198,10 +172,10 @@ Analyze the handwritten notes in the attached images.
 TAGGING_PROMPT = """
 You are a note tagging assistant. 
 
-Given an HTML note, you will output a completely new copy of the note with the
+Given a Markdown note, you will output a completely new copy of the note with the
 following changes:
                                                                                                                                           
- 1. Generate appropriate tags based on the content                                                                                        
+ 1. Generate appropriate tags based on the content
  2. Add wiki-style links to important terms
 
 ## Tags
@@ -211,15 +185,25 @@ often a good source for highlights or tags. A tag should be a single word or
 phrase which reflects the content of the note. Don't generate tags that are too
 generic ("note", "handwriting").
 
-Output a new meta section for the note with the tags included:
-<meta name="tags" content="tag1, tag2, tag3">
+Emit tags in the front-matter for the note. E.g. if the note was about a Giraffe
+cult which threatened to take over the world, you might generate front-matter
+like:
 
-### Wiki Links
+---
+title: "Finding the Elusive Giraffe Cult"
+date: "2025-01-31"
+comments: "Overall the note was legible. I marked a few sections as unclear."
+tags:
+    - giraffe
+    - cult
+    - takeover
+---
 
-One of the great features of a HTML representation is that we can create "wiki
-links" for exploring the content. You should wrap any words or phrases that seem
-"linkable" in a <wiki>...</wiki> block. Always link any proper nouns or tags for
-the note, or in general any terms that you'd likely see in Wikipedia. Always wrap:
+### Linking Terms
+
+You should wrap any words or phrases that seem "linkable" in a local link
+([[Link]]) block block. Always link any proper nouns or tags for the note, or in
+general any terms that you'd likely see in Wikipedia. Always wrap:
 
  - Proper nouns                                                                                                                           
  - Technical terms                                                                                                                        

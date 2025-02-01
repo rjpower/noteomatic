@@ -1,7 +1,7 @@
 import base64
-import hashlib
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import traceback
@@ -22,19 +22,28 @@ from flask import (
     request,
     url_for,
 )
+from markdown_it import MarkdownIt
+from mdit_py_plugins.footnote import footnote_plugin
+from mdit_py_plugins.front_matter import front_matter_plugin
+from mdit_py_plugins.tasklists import tasklists_plugin
 
 from noteomatic.config import settings
 from noteomatic.demo.database import NoteModel, get_repo
 from noteomatic.lib import extract_from_files
+from noteomatic.notes import note_hash
 
 # Cache for database connection
 _db_connection = None
 
 
-def _get_note_hash(title: str) -> str:
-    """Generate a consistent hash for note sharing"""
-    return hashlib.md5(title.encode()).hexdigest()[:8]
-
+# Initialize markdown parser
+md = (
+    MarkdownIt("commonmark", {"breaks": True, "html": True})
+    .use(front_matter_plugin)
+    .use(footnote_plugin)
+    .use(tasklists_plugin)
+    .enable("table")
+)
 
 def get_note_by_id(note_id: int) -> NoteModel:
     """Get a note by its ID"""
@@ -76,7 +85,7 @@ def load_notes_from_dir(dir: Path) -> List[NoteModel]:
         for dirpath, dirnames, filenames in os.walk(dir):
             for filename in filenames:
                 file = Path(dirpath) / filename
-                if file.is_dir() or file.suffix != ".html":
+                if file.is_dir() or file.suffix != ".md":
                     continue
 
                 content, note = NoteModel.from_file(file, NOTES_DIR)
@@ -153,6 +162,14 @@ def index():
     return render_template("index.html", notes=notes, show_search=True)
 
 
+def process_wikilinks(content: str) -> str:
+    """Convert [[tag]] syntax to links"""
+    def replace_link(match):
+        tag = match.group(1)
+        return f'<a href="/tag/{tag}">{tag}</a>'
+    
+    return re.sub(r'\[\[([^\]]+)\]\]', replace_link, content)
+
 @app.route("/note/<int:note_id>", methods=["GET"])
 def show_note(note_id):
     """Display a specific note"""
@@ -160,32 +177,11 @@ def show_note(note_id):
     if not note:
         abort(404, "Note not found")
 
-    # Process any graph tags
-    soup = bs4.BeautifulSoup(note.raw_content, "html.parser")
-    for graph_tag in soup.find_all("graph"):
-        # Create an img tag to replace the graph
-        img = soup.new_tag("img")
-        graph_content = graph_tag.string or ""
-        img["src"] = (
-            f"/graph?dot={base64.urlsafe_b64encode(graph_content.encode()).decode()}"
-        )
-        img["class"] = "graph"
-        img["style"] = "max-width: 100%; height: auto;"
-        graph_tag.replace_with(img)
-
-    # convert <sidenote> to <span class="sidenote">
-    for sidenote_tag in soup.find_all("sidenote"):
-        sidenote_tag.name = "span"
-        sidenote_tag["class"] = "sidenote"
-
-    # convert <link> to links to the tag page
-    for link_tag in soup.find_all("wiki"):
-        link_tag.name = "a"
-        link_tag["href"] = url_for("show_tag", tag=link_tag.string)
-        link_tag["class"] = "tag-link"
-
-        # put text in the body of the link
-        # link_tag.string.wrap(soup.new_tag("span"))
+    # First render markdown to HTML
+    html_content = md.render(note.raw_content)
+    
+    # Process any [[tag]] links
+    html_content = process_wikilinks(html_content)
 
     # compute prev_url and next_url
     note_index = int(note.id)
@@ -201,7 +197,7 @@ def show_note(note_id):
     return render_template(
         "note.html",
         note_id=note_id,
-        content=soup.prettify(),
+        content=html_content,
         title=note.title,
         date=note.created_at.strftime("%Y-%m-%d"),
         tags=note.tags,
@@ -263,7 +259,7 @@ def share_note(note_id):
         )
 
         # Save HTML file
-        file_hash = _get_note_hash(note.title)
+        file_hash = note_hash(note.title)
         output_file = temp_path / f"{file_hash}.html"
         output_file.write_text(standalone_html)
 
